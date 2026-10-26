@@ -1,0 +1,7 @@
+{
+  "task_id": "task-field-discovery",
+  "task_description": "Build the Field Discovery Agent — Layer 1 of the Field-to-Fix V-cycle. Creates an AWS Bedrock Agent backed by two action-group Lambdas that crawl and aggregate Stellantis/Uconnect complaints from public sources, deduplicate and prioritize actionable issues. Wires into the backend connector/stage/registry pattern and provides a frontend component.",
+  "status": "pending",
+  "feature_order": ["FEAT-001", "FEAT-002", "FEAT-003"],
+  "blocked_reason": null
+}

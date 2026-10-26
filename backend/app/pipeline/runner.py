@@ -143,9 +143,9 @@ def _decide_sfn(case_id: str, approved: bool, approver: str, comment: str) -> bo
 
 def handlers() -> dict[str, Callable[[StageContext], None]]:
     from ..agents import stages as s
-    return {"detect": s.detect, "triage": s.triage, "ticket": s.ticket, "fleet": s.fleet, "reproduce": s.reproduce,
-            "rca": s.rca, "requirement": s.requirement, "fix": s.fix, "verify": s.verify, "approve": s.approve,
-            "release": s.release, "monitor": s.monitor}
+    return {"field_discovery": s.field_discovery, "detect": s.detect, "triage": s.triage, "ticket": s.ticket,
+            "fleet": s.fleet, "reproduce": s.reproduce, "rca": s.rca, "requirement": s.requirement,
+            "fix": s.fix, "verify": s.verify, "approve": s.approve, "release": s.release, "monitor": s.monitor}
 
 
 def init_stages(case: Case) -> None:
