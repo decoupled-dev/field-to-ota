@@ -1,0 +1,27 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>DriveTalk Owners Forum</title>
+<style>
+:root{--fg:#1f2328;--muted:#656d76;--line:#d0d7de;--bg:#f6f8fa;--accent:#0b6e4f}
+body{margin:0;font:14px/1.5 -apple-system,"Segoe UI",Roboto,sans-serif;color:var(--fg);background:var(--bg)}
+.top{background:#fff;border-bottom:1px solid var(--line)}.wrap{max-width:860px;margin:0 auto;padding:14px 16px}
+.logo{font-weight:700;color:var(--accent);font-size:17px}.logo span{color:var(--muted);font-weight:400;font-size:13px;margin-left:8px}
+.post{background:#fff;border:1px solid var(--line);border-radius:6px;padding:14px 16px;margin:12px 0}
+.post h3{margin:0 0 4px;font-size:15px}.by{color:var(--muted);font-size:12px;margin-bottom:6px}
+.reply{border-left:3px solid var(--accent);background:#f0f7f4;padding:8px 12px;margin-top:10px;border-radius:0 4px 4px 0;font-size:13px}
+form{background:#fff;border:1px solid var(--line);border-radius:6px;padding:14px 16px}
+input,textarea{width:100%;box-sizing:border-box;font:inherit;padding:7px 9px;border:1px solid var(--line);border-radius:6px;margin:4px 0 10px}
+button{font:inherit;padding:7px 14px;border-radius:6px;border:1px solid var(--accent);background:var(--accent);color:#fff;cursor:pointer}
+button.alt{background:#fff;color:var(--accent)}
+</style></head><body>
+<div class="top"><div class="wrap"><span class="logo">DriveTalk<span>Apex Terra owners forum · Infotainment &amp; Connectivity</span></span></div></div>
+<div class="wrap">
+<form method="post" action="/forum/posts"><b>New thread</b>
+<input name="author" placeholder="Username" required><input name="title" placeholder="Title" required>
+<textarea name="body" rows="4" placeholder="Describe the issue" required></textarea>
+<button type="submit">Post</button> <button type="button" class="alt" onclick="demo()">Fill example</button></form>
+{% for p in posts %}<div class="post" id="{{ p.id }}"><h3>{{ p.title }}</h3><div class="by">{{ p.author }} · {{ p.ts|dt }}</div><div>{{ p.body }}</div>
+{% for r in replies.get(p.id, []) %}<div class="reply"><b>{{ r.author }}</b> · {{ r.ts|dt }}<br>{{ r.body }}</div>{% endfor %}</div>{% endfor %}
+</div>
+<script>function demo(){const f=document.forms[0];f.author.value='winterdriver_ch';f.title.value='Cold start: Bluetooth music crackles, then Android Auto reconnects';
+f.body.value='Every morning at around -5C my music crackles for a bit after I start the car and then Android Auto reconnects. Software HU-2.3.1. Dealer says they cannot reproduce it in the workshop (it is warm in there).'}</script>
+</body></html>

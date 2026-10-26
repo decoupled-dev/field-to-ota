@@ -1,0 +1,7 @@
+{% extends "base.html" %}{% block body %}
+<p class="meta">Built-in issue tracker (Jira connector running in simulated mode: set JIRA_URL / JIRA_EMAIL / JIRA_API_TOKEN to use your Jira site).</p>
+<table><tr><th>Key</th><td>{{ issue.key }}</td><th>Status</th><td><span class="chip {{ 'passed' if issue.status=='Done' else 'pending' }}">{{ issue.status }}</span></td><th>Priority</th><td>{{ issue.severity }}</td></tr>
+<tr><th>Labels</th><td colspan="5">{{ issue.labels|join(', ') }}</td></tr></table>
+<h2>Description</h2><pre>{{ issue.description }}</pre>
+<h2>Activity</h2>{% for c in issue.comments %}<pre>{{ c }}</pre>{% else %}<p class="meta">No comments yet.</p>{% endfor %}
+{% endblock %}

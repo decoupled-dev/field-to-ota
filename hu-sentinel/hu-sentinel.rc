@@ -1,0 +1,20 @@
+# /system_ext/etc/init/hu-sentinel.rc
+# Field-to-Fix head-unit health daemon (AAOS). Runs unprivileged in its own SELinux domain.
+service hu_sentinel /system_ext/bin/hu-sentinel --config /data/vendor/hu-sentinel/config.json
+    class late_start
+    user hu_sentinel
+    group log readproc inet
+    capabilities
+    priority 10
+    ioprio idle 7
+    writepid /dev/cpuset/background/tasks
+    task_profiles ServiceCapacityLow
+    oneshot_disabled
+    restart_period 30
+
+on post-fs-data
+    mkdir /data/vendor/hu-sentinel 0750 hu_sentinel hu_sentinel
+    mkdir /data/vendor/hu-sentinel/spool 0700 hu_sentinel hu_sentinel
+
+on property:sys.boot_completed=1
+    start hu_sentinel

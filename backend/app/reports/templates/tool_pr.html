@@ -1,0 +1,7 @@
+{% extends "base.html" %}{% block body %}
+<p class="meta">Local git remote (GitHub connector running in simulated mode: set GITHUB_TOKEN / GITHUB_REPO to open real pull requests).</p>
+<table><tr><th>Branch</th><td><code>{{ pr.branch }}</code> → <code>main</code></td><th>Status</th><td><span class="chip {{ 'passed' if pr.status=='merged' else 'pending' }}">{{ pr.status }}</span></td></tr></table>
+<h2>Description</h2><pre>{{ pr.body }}</pre>
+<h2>Commits</h2><pre>{{ pr.commits }}</pre>
+<h2>Diff</h2><pre>{{ pr.diff }}</pre>
+{% endblock %}

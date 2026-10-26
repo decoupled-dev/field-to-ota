@@ -1,0 +1,83 @@
+[
+ {
+  "source": "reddit",
+  "hours_ago": 30,
+  "author": "u/frostbite_commuter",
+  "external_id": "t3_1gk2x9a",
+  "url": "https://www.reddit.com/r/AndroidAuto/comments/1gk2x9a/",
+  "title": "Bluetooth audio stutters for the first minute every cold morning since HU 2.3.1",
+  "body": "Ever since the head unit updated to 2.3.1 last week, every morning when it's below freezing the Spotify audio over Bluetooth crackles and stutters for ~30 seconds, then Android Auto disconnects and reconnects. Afternoons are fine. Anyone else?"
+ },
+ {
+  "source": "reddit",
+  "hours_ago": 26,
+  "author": "u/nordic_ev_dad",
+  "external_id": "t3_1gk9b1c",
+  "url": "https://www.reddit.com/r/AndroidAuto/comments/1gk9b1c/",
+  "title": "AA drops right after start when it's -10C outside",
+  "body": "Model Y-type SUV, HU-2.3.1. At -10C the audio is choppy right after ignition and Android Auto drops for half a minute. Warm garage = no issue. Feels like something times out during boot."
+ },
+ {
+  "source": "x",
+  "hours_ago": 20,
+  "author": "@mkessler_drives",
+  "external_id": "1849912345678",
+  "url": "https://x.com/mkessler_drives/status/1849912345678",
+  "title": "Podcast audio cuts out every cold start since the latest update",
+  "body": "@ApexMotorsHelp since the latest infotainment update my podcast audio stutters and cuts every cold start. Only in the morning frost. Fix pls"
+ },
+ {
+  "source": "issuetracker",
+  "hours_ago": 16,
+  "author": "oem-partner@apexmotors",
+  "external_id": "b/373201117",
+  "url": "https://issuetracker.google.com/issues/373201117",
+  "title": "A2DP sink underruns during early boot on AAOS 14 reference HU at low ambient temp",
+  "body": "Observed AudioFlinger underruns and BluetoothA2dp sink stall during the first second after boot when ambient < 0C. Audio HAL onReady arrives late (~900ms). Media stack starts streaming before HAL ready."
+ },
+ {
+  "source": "partner_jira",
+  "hours_ago": 12,
+  "author": "tier1-audio-qa",
+  "external_id": "AUD-4471",
+  "url": "https://partner-jira.example.com/browse/AUD-4471",
+  "title": "Field return: BT audio crackle at cold start (HU-2.3.1, cold chamber reproducible)",
+  "body": "Cold chamber at -8C reproduces crackling on A2DP right after ignition on HU-2.3.1 samples. Not reproducible at 20C. Suspect startup sequencing in media service."
+ },
+ {
+  "source": "reddit",
+  "hours_ago": 40,
+  "author": "u/carplay_curious",
+  "external_id": "t3_1gj1aa0",
+  "url": "https://www.reddit.com/r/CarPlay/comments/1gj1aa0/",
+  "title": "Loving the new home screen layout in the update",
+  "body": "The new widget layout is clean. Took a day to get used to but I like it."
+ },
+ {
+  "source": "x",
+  "hours_ago": 9,
+  "author": "@routefinder22",
+  "external_id": "1849977001234",
+  "url": "https://x.com/routefinder22/status/1849977001234",
+  "title": "Navigation keeps rerouting in the Gotthard tunnel",
+  "body": "Nav reroutes 3-4 times in long tunnels, lost GPS handling seems off. HU-2.2.9."
+ },
+ {
+  "source": "forum",
+  "hours_ago": 50,
+  "author": "detailing_dan",
+  "external_id": "dt-8790",
+  "url": "/forum#dt-8790",
+  "title": "Best ceramic coating for winter?",
+  "body": "Looking for recommendations before the salt season starts."
+ },
+ {
+  "source": "forum",
+  "hours_ago": 28,
+  "author": "alpine_tom",
+  "external_id": "dt-8801",
+  "url": "/forum#dt-8801",
+  "title": "Which winter tyres for the SUV?",
+  "body": "Planning to switch next week. Recommendations?"
+ }
+]

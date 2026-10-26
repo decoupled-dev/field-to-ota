@@ -1,0 +1,16 @@
+{% extends "base.html" %}{% block body %}
+<div class="grid">
+<div class="kpi"><b>{{ impact.total_vins }}</b><span>Fleet in scope</span></div>
+<div class="kpi"><b>{{ impact.affected_n }}</b><span>Affected (boot underruns)</span></div>
+<div class="kpi"><b>{{ impact.severe_n }}</b><span>With Android Auto drops</span></div>
+<div class="kpi"><b>{{ rollout.get('succeeded', 0) }}/{{ rollout.get('cohort', 0) }}</b><span>OTA succeeded</span></div>
+</div>
+<h2>By software version</h2><table><tr><th>Version</th><th>Affected</th><th>Total</th></tr>
+{% for v in impact.by_version %}<tr><td>{{ v.sw_version }}</td><td>{{ v.affected }}</td><td>{{ v.total }}</td></tr>{% endfor %}</table>
+<h2>By region</h2><table><tr><th>Region</th><th>Affected</th><th>Total</th><th>Rate</th></tr>
+{% for v in impact.by_region %}<tr><td>{{ v.region }}</td><td>{{ v.affected }}</td><td>{{ v.total }}</td><td>{{ (100*v.affected/v.total)|round(1) }} %</td></tr>{% endfor %}</table>
+<h2>By minimum ambient temperature</h2><table><tr><th>Bucket</th><th>Affected</th><th>Total</th></tr>
+{% for v in impact.by_temp %}<tr><td>{{ v.bucket }}</td><td>{{ v.affected }}</td><td>{{ v.total }}</td></tr>{% endfor %}</table>
+<h2>Rollout</h2><table><tr><th>Job</th><td>{{ rollout.get('job_id','-') }}</td><th>Wave</th><td>{{ rollout.get('wave','-') }}</td><th>Failed</th><td>{{ rollout.get('failed',0) }}</td></tr></table>
+<p class="meta">Vehicles beyond the canary wave are simulated in the prototype.</p>
+{% endblock %}

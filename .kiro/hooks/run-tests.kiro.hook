@@ -1,0 +1,8 @@
+{
+  "enabled": true,
+  "name": "Run tests on backend change",
+  "description": "Run the offline E2E pipeline test whenever backend code changes",
+  "version": "1",
+  "when": { "type": "fileEdited", "patterns": ["backend/app/**/*.py"] },
+  "then": { "type": "askAgent", "prompt": "Backend code changed. Run `.venv/bin/python -m pytest -q backend/tests` and fix any failure before continuing." }
+}

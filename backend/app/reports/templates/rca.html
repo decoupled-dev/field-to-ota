@@ -1,0 +1,10 @@
+{% extends "base.html" %}{% block body %}{% set r = stages.get('rca') %}{% set rca = (r.artifacts|selectattr('kind','equalto','json')|first).content if r and r.artifacts else {} %}
+<h2>Problem statement</h2><p>{{ stages.get('triage').summary }}</p>
+<h2>Root cause</h2><p>{{ r.summary }}</p>
+<table><tr><th>Origin</th><td>{{ rca.get('origin','-') }}</td><th>Confidence</th><td>{{ rca.get('confidence','-') }}</td><th>Regression commit</th><td><code>{{ r.outputs.get('regression_commit','-') }}</code></td></tr></table>
+<h2>Mechanism</h2><ol>{% for m in rca.get('mechanism', []) %}<li>{{ m }}</li>{% endfor %}</ol>
+<h2>Why verification missed it</h2><p>{{ rca.get('escape_reason','') }}</p>
+<h2>Evidence</h2><ul>{% for e in rca.get('evidence', []) %}<li>{{ e }}</li>{% endfor %}</ul>
+<h2>Reproduction</h2><p>{{ stages.get('reproduce').summary }}</p>
+{% for a in r.artifacts if a.kind == 'diff' %}<h2>{{ a.name }}</h2><pre>{{ a.content }}</pre>{% endfor %}
+{% endblock %}

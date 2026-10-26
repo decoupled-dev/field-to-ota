@@ -1,0 +1,15 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "Enforce UI design rules on component save",
+      "trigger": "PostFileSave",
+      "description": "Enforce UI design rules from .kiro/steering/ui.md after any frontend component is saved",
+      "matcher": "frontend/src/.*\\.tsx$",
+      "action": {
+        "type": "agent",
+        "prompt": "A React component was saved. Review it against .kiro/steering/ui.md: check palette (neutral slate, blue-600 accent only), status colours (emerald/blue/amber/red/slate), no gradients/emoji/glassmorphism, 8px grid, Inter font, simulated connector labels. If any rule is violated, fix it in place."
+      }
+    }
+  ]
+}

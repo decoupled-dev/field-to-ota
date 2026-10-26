@@ -1,0 +1,15 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "Run media-service tests on change",
+      "trigger": "PostFileSave",
+      "description": "Run media-service tests when media_service code changes (the component the fix agent patches)",
+      "matcher": "media-service/.*\\.py$",
+      "action": {
+        "type": "agent",
+        "prompt": "media-service Python file saved. Run `cd media-service && ../.venv/bin/python -m pytest -q` to check regression tests. If tests fail, this may indicate a bad patch was applied by the Fix agent — diagnose whether the failure is in the fix or the test, report clearly, and suggest a correction."
+      }
+    }
+  ]
+}

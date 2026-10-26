@@ -1,0 +1,15 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "Run backend tests on Python change",
+      "trigger": "PostFileSave",
+      "description": "Auto-run offline E2E tests whenever backend app code changes and fix failures",
+      "matcher": "backend/app/.*\\.py$",
+      "action": {
+        "type": "agent",
+        "prompt": "Backend Python file saved. Run `.venv/bin/python -m pytest -q backend/tests` and if any tests fail, diagnose the failure, fix the code in backend/app, and re-run until green. Do not ask for confirmation — fix it autonomously."
+      }
+    }
+  ]
+}

@@ -1,0 +1,41 @@
+{
+  "version": 3,
+  "rules": [
+    {
+      "id": "BT_AUDIO_UNDERRUN",
+      "description": "Bluetooth audio starvation at startup followed by an A2DP sink stall",
+      "match": "AudioFlinger: .*underrun",
+      "count": 20,
+      "window_s": 10,
+      "all_of": [
+        { "id": "A2DP_STALL", "match": "BluetoothA2dp: A2DP sink stalled", "count": 1, "window_s": 10 }
+      ],
+      "severity": "high",
+      "capture": ["logs_60s", "proc", "audio_15s", "screen_15s"],
+      "cooldown_s": 60,
+      "summary": "{count} AudioFlinger underruns in {window_s}s + A2DP stall"
+    },
+    {
+      "id": "APP_ANR",
+      "description": "Application not responding on the head unit",
+      "match": "ActivityManager: ANR in",
+      "count": 1,
+      "window_s": 60,
+      "severity": "medium",
+      "capture": ["logs_60s", "proc", "screen_15s"],
+      "cooldown_s": 300,
+      "summary": "ANR detected ({count} in {window_s}s)"
+    },
+    {
+      "id": "NATIVE_CRASH",
+      "description": "Native process crash (debuggerd tombstone)",
+      "match": "DEBUG +: \\*\\*\\* \\*\\*\\* \\*\\*\\*",
+      "count": 1,
+      "window_s": 60,
+      "severity": "critical",
+      "capture": ["logs_60s", "proc", "tombstone"],
+      "cooldown_s": 120,
+      "summary": "Native crash (tombstone written)"
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+FROM public.ecr.aws/lambda/python:3.12
+RUN dnf install -y git && dnf clean all
+COPY backend/requirements.txt /tmp/req.txt
+RUN pip install --no-cache-dir -r /tmp/req.txt
+COPY backend ${LAMBDA_TASK_ROOT}/backend
+COPY sim ${LAMBDA_TASK_ROOT}/sim
+COPY data ${LAMBDA_TASK_ROOT}/data
+COPY media-service ${LAMBDA_TASK_ROOT}/media-service
+CMD ["backend.app.aws_lambda.stage_group"]

@@ -1,0 +1,8 @@
+{
+  "enabled": true,
+  "name": "Check UI against design rules",
+  "description": "Review edited frontend components against .kiro/steering/ui.md",
+  "version": "1",
+  "when": { "type": "fileEdited", "patterns": ["frontend/src/**/*.tsx"] },
+  "then": { "type": "askAgent", "prompt": "Review the edited component against .kiro/steering/ui.md (palette, status colours, no gradients/emoji, density, simulated labels). Fix deviations." }
+}

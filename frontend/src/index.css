@@ -1,0 +1,51 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: 210 20% 98%;
+  --surface: 0 0% 100%;
+  --subtle: 210 20% 96%;
+  --border: 214 20% 89%;
+  --fg: 222 47% 11%;
+  --muted: 215 16% 44%;
+  --accent: 221 83% 53%;
+  --accent-fg: 0 0% 100%;
+  --ok: 160 84% 32%;
+  --run: 221 83% 53%;
+  --warn: 32 95% 44%;
+  --bad: 0 72% 51%;
+  color-scheme: light;
+}
+.dark {
+  --bg: 222 22% 7%;
+  --surface: 222 20% 10%;
+  --subtle: 220 17% 14%;
+  --border: 217 15% 20%;
+  --fg: 210 20% 94%;
+  --muted: 215 14% 62%;
+  --accent: 217 91% 60%;
+  --accent-fg: 0 0% 100%;
+  --ok: 158 64% 45%;
+  --run: 217 91% 62%;
+  --warn: 38 92% 55%;
+  --bad: 0 84% 63%;
+  color-scheme: dark;
+}
+
+html, body, #root { height: 100%; }
+body {
+  @apply bg-bg text-fg font-sans text-sm antialiased;
+  font-feature-settings: "cv11", "ss01";
+}
+.tnum { font-variant-numeric: tabular-nums; }
+::selection { background: hsl(var(--accent) / 0.2); }
+* { scrollbar-width: thin; scrollbar-color: hsl(var(--border)) transparent; }
+
+/* React Flow theming */
+.react-flow__attribution { display: none; }
+.react-flow { --xy-background-color: transparent; }
+.react-flow__edge-path { stroke: hsl(var(--border)); stroke-width: 1.5; }
+.react-flow__edge.active .react-flow__edge-path { stroke: hsl(var(--run)); }
+.react-flow__edge.done .react-flow__edge-path { stroke: hsl(var(--ok) / 0.6); }
+.react-flow__handle { opacity: 0; }

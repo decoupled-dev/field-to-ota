@@ -1,0 +1,28 @@
+{% extends "base.html" %}{% block body %}
+{% set appr = stages.get('approve') %}{% set ver = stages.get('verify') %}{% set rel = stages.get('release') %}
+<div class="grid">
+<div class="kpi"><b>{{ case.sw_version or '-' }} → {{ case.fixed_version or '-' }}</b><span>Software</span></div>
+<div class="kpi"><b>{{ case.affected_vins }}</b><span>Affected vehicles</span></div>
+<div class="kpi"><b>{{ case.fixed_vins }}</b><span>Updated over the air</span></div>
+<div class="kpi"><b>{% if case.closed_at %}{{ ((case.closed_at - case.created_at)/60)|round(1) }} min{% else %}open{% endif %}</b><span>Field report → verified OTA</span></div>
+</div>
+<h2>Traceability</h2>
+<table><tr><th>Link</th><th>Artifact</th><th>Reference</th></tr>
+<tr><td>Field reports</td><td>{{ signals|length }} signals ({{ signals|map(attribute='source.value')|unique|join(', ') }})</td><td>{{ case.id }}</td></tr>
+{% for l in case.links %}<tr><td>{{ {'jira':'Defect','github':'Change','iot':'Release'}.get(l.tool, l.tool) }}</td><td>{{ l.label }}</td><td><a href="{{ l.url }}">{{ l.url }}</a></td></tr>{% endfor %}
+<tr><td>Requirement</td><td>{{ stages.get('requirement').outputs.get('requirement','-') }} rev {{ stages.get('requirement').outputs.get('revision','-') }}</td><td>{{ (stages.get('requirement').outputs.get('trace') or {}).get('tests', [])|join(', ') }}</td></tr>
+<tr><td>Regression commit</td><td>{{ stages.get('rca').outputs.get('regression_commit','-') }}</td><td>origin: {{ stages.get('rca').outputs.get('origin','-') }}</td></tr>
+<tr><td>Verification</td><td>{{ ver.outputs.get('summary_line','-') if ver else '-' }}</td><td>replay conditions: {{ ver.outputs.get('replay_conditions','-') if ver else '-' }}</td></tr>
+<tr><td>Payload</td><td>media-service {{ rel.outputs.get('version','-') if rel else '-' }}</td><td><code>sha256 {{ (rel.outputs.get('sha256','') if rel else '')[:32] }}…</code></td></tr>
+<tr><td>Approval</td><td>{{ appr.outputs.get('approver','pending') if appr else 'pending' }}</td><td>{{ appr.outputs.get('approved_at')|dt if appr and appr.outputs.get('approved_at') else '-' }}</td></tr>
+</table>
+<h2>Stage record</h2>
+<table><tr><th>#</th><th>Stage</th><th>V-model level</th><th>Status</th><th>Outcome</th><th>Ended</th></tr>
+{% for d in defs %}{% set r = stages.get(d.key) %}<tr><td>{{ loop.index }}</td><td>{{ d.name }}</td><td>{{ d.v_level }}</td>
+<td><span class="chip {{ r.status.value if r else 'pending' }}">{{ r.status.value if r else 'pending' }}</span>{% if r and r.simulated %} <span class="chip">simulated</span>{% endif %}</td>
+<td>{{ r.summary if r else '' }}</td><td>{{ r.ended_at|dt if r else '-' }}</td></tr>{% endfor %}</table>
+<h2>Root cause</h2><p>{{ stages.get('rca').summary }}</p>
+<h2>Field reports</h2>
+<table><tr><th>Source</th><th>Reporter</th><th>Report</th><th>Received</th></tr>
+{% for s in signals %}<tr><td>{{ s.source.value }}</td><td>{{ s.author or s.vin }}</td><td>{{ s.title }}</td><td>{{ s.created_at|dt }}</td></tr>{% endfor %}</table>
+{% endblock %}

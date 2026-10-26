@@ -1,0 +1,24 @@
+{
+  "thing": "hu-demo-001",
+  "vin": "WF0SXXGCDSPF4D2C1",
+  "uplink": "http",
+  "api_base": "http://127.0.0.1:8000",
+  "iot": {
+    "endpoint": "xxxxxxxxxxxxxx-ats.iot.us-east-1.amazonaws.com",
+    "cert": ".keys/device/hu-demo-001.cert.pem",
+    "key": ".keys/device/hu-demo-001.private.key",
+    "ca": ".keys/device/AmazonRootCA1.pem"
+  },
+  "log_path": ".hu/logcat.log",
+  "rules_path": "hu-sentinel/rules.json",
+  "service_path": ".hu/system/media-service",
+  "ota_pubkey_path": ".keys/ota_signing.pub",
+  "spool_dir": ".hu/spool",
+  "spool_max_mb": 64,
+  "poll_interval_s": 5,
+  "max_uploads_per_hour": 12,
+  "ring_lines": 4000,
+  "ring_seconds": 60,
+  "audio_path": "",
+  "screen_path": ""
+}

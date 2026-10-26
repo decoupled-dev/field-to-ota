@@ -1,0 +1,11 @@
+.venv
+infra/.venv
+infra/cdk.out
+frontend/node_modules
+frontend/dist
+.state
+.hu
+.keys
+.git
+hu-sentinel/bin
+**/__pycache__

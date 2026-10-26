@@ -1,0 +1,15 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "Validate CDK stack after infra change",
+      "trigger": "PostFileSave",
+      "description": "Validate CDK infra changes and check Bedrock/IAM permissions are correct after infra/app.py is saved",
+      "matcher": "infra/.*\\.py$",
+      "action": {
+        "type": "agent",
+        "prompt": "infra/app.py was saved. Run `cd infra && .venv/bin/python app.py 2>&1` to synth the CDK stack. If synthesis fails, diagnose and fix the issue. Also verify: (1) all Lambda functions have the bedrock:Converse + bedrock:InvokeModel IAM policy, (2) stage_fn has iot:CreateJob permission, (3) the Step Functions approval step uses WAIT_FOR_TASK_TOKEN. Report the resource count in the synth output."
+      }
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "Load field-to-fix session context",
+      "trigger": "SessionStart",
+      "description": "Remind Kiro of the Bedrock + connector architecture at session start",
+      "action": {
+        "type": "agent",
+        "prompt": "You are working in the field-to-fix workspace — an agentic V-cycle for automotive OEMs (forum/device complaints → AI stages → signed OTA). Key facts:\n- Backend: Python/FastAPI in backend/app. Agents in agents/stages.py. LLM: Amazon Bedrock Converse API (Claude) via llm.py. Falls back to deterministic analyzers offline.\n- Connectors: capability-based (base.py + registry.py). Unconfigured ones run in labelled \"simulated\" mode.\n- AWS mode: Step Functions pipeline, EventBridge, IoT Core, DynamoDB, S3, App Runner. CDK stack in infra/app.py.\n- Frontend: React+TypeScript+Vite+Tailwind in frontend/. Follow ui.md design rules.\n- Tests: `.venv/bin/python -m pytest -q backend/tests` (offline E2E), `cd media-service && ../.venv/bin/python -m pytest -q`.\n- MCP servers configured: aws-core, aws-docs, bedrock-kb, aws-iot, aws-diagram, github.\n- Never fake results; if a connector is not configured, label it \"simulated\" in the UI."
+      }
+    }
+  ]
+}
