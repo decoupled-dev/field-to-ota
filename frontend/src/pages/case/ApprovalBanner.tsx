@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ShieldCheck } from "lucide-react";
+import { ArrowUpRight } from "lucide-react";
 import { api, reportUrl, type StageRun } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input, Label, Textarea } from "@/components/ui/field";
@@ -41,18 +41,22 @@ export function ApprovalBanner({ caseId, run, onDone }: { caseId: string; run: S
   const evidence = Object.entries(run.inputs ?? {}).slice(0, 6);
 
   return (
-    <div className="rounded-lg border border-warn/40 bg-warn/5">
-      <div className="flex flex-wrap items-start gap-4 px-4 py-3">
-        <ShieldCheck size={18} className="mt-0.5 shrink-0 text-warn" />
+    <div className="relative overflow-hidden rounded-md border border-warn/45 bg-warn/[0.06]">
+      <div className="hazard absolute inset-y-0 left-0 w-2 opacity-80" />
+      <div className="flex flex-wrap items-center gap-x-8 gap-y-4 py-4 pl-7 pr-4">
         <div className="min-w-0 flex-1">
-          <div className="text-sm font-semibold">Release approval required</div>
-          <div className="mt-0.5 text-sm text-muted">{run.summary || "Review the evidence pack before the OTA is rolled out to the affected cohort."}</div>
+          <div className="label flex items-center gap-2 text-warn">
+            <span className="h-1.5 w-1.5 animate-pulseSoft rounded-full bg-warn" />
+            Release gate · human approval required
+          </div>
+          <div className="mt-1.5 text-[16px] font-semibold tracking-tight">Sign off the OTA before it reaches the fleet</div>
+          <div className="mt-1 max-w-3xl text-[13px] leading-5 text-muted">{run.summary || "Review the evidence pack before the OTA is rolled out to the affected cohort."}</div>
           {evidence.length > 0 && (
-            <dl className="mt-2 flex flex-wrap gap-x-6 gap-y-1 text-xs">
+            <dl className="mt-3 flex flex-wrap gap-x-6 gap-y-1.5">
               {evidence.map(([k, v]) => (
-                <div key={k} className="flex gap-1.5">
-                  <dt className="text-muted">{k.replace(/_/g, " ")}</dt>
-                  <dd className="tnum font-medium">{typeof v === "object" ? JSON.stringify(v) : String(v)}</dd>
+                <div key={k} className="flex items-baseline gap-2">
+                  <dt className="font-mono text-2xs uppercase tracking-[0.06em] text-faint">{k.replace(/_/g, " ")}</dt>
+                  <dd className="tnum font-mono text-[12px] text-fg">{typeof v === "object" ? JSON.stringify(v) : String(v)}</dd>
                 </div>
               ))}
             </dl>
@@ -60,10 +64,10 @@ export function ApprovalBanner({ caseId, run, onDone }: { caseId: string; run: S
         </div>
         <div className="flex items-center gap-2">
           <a href={reportUrl(caseId, "evidence")} target="_blank" rel="noreferrer">
-            <Button size="sm" variant="ghost">Open evidence pack</Button>
+            <Button size="md" variant="secondary">Evidence pack <ArrowUpRight size={13} /></Button>
           </a>
-          <Button size="sm" variant="danger" onClick={() => setMode("reject")}>Reject</Button>
-          <Button size="sm" variant="primary" onClick={() => setMode("approve")}>Approve release</Button>
+          <Button size="md" variant="danger" onClick={() => setMode("reject")}>Reject</Button>
+          <Button size="md" variant="primary" onClick={() => setMode("approve")}>Approve release</Button>
         </div>
       </div>
       <Modal
@@ -72,7 +76,7 @@ export function ApprovalBanner({ caseId, run, onDone }: { caseId: string; run: S
         title={mode === "approve" ? "Approve OTA release" : "Reject release"}
         description={mode === "approve" ? "Your approval is recorded in the evidence pack and the release audit trail." : "The pipeline stops and the case returns to engineering."}
       >
-        <div className="space-y-3">
+        <div className="space-y-4">
           <div>
             <Label htmlFor="approver">Approver</Label>
             <Input id="approver" value={approver} onChange={(e) => setApprover(e.target.value)} placeholder="Name, role" autoFocus />
@@ -81,11 +85,11 @@ export function ApprovalBanner({ caseId, run, onDone }: { caseId: string; run: S
             <Label htmlFor="comment">Comment</Label>
             <Textarea id="comment" value={comment} onChange={(e) => setComment(e.target.value)} placeholder={mode === "approve" ? "e.g. Evidence reviewed; canary first." : "Reason for rejection"} />
           </div>
-          {err && <div className="text-xs text-bad">{err}</div>}
+          {err && <div className="font-mono text-2xs text-bad">{err}</div>}
           <div className="flex justify-end gap-2 pt-1">
-            <Button size="sm" variant="secondary" onClick={() => setMode(null)}>Cancel</Button>
+            <Button size="sm" variant="ghost" onClick={() => setMode(null)}>Cancel</Button>
             <Button size="sm" variant={mode === "approve" ? "primary" : "danger"} disabled={busy || !approver.trim()} onClick={submit}>
-              {mode === "approve" ? "Approve" : "Reject"}
+              {mode === "approve" ? "Approve & release" : "Reject"}
             </Button>
           </div>
         </div>

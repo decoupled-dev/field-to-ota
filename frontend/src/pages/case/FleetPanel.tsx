@@ -4,37 +4,44 @@ import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Empty, ErrorState, Skeleton } from "@/components/ui/states";
 import { Table, Td, Th, Tr } from "@/components/ui/table";
-import { Bar, BarChart, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis, axis, grid, legend, tooltipProps } from "@/components/charts";
+import { Area, AreaChart, Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis, axis, grid, legend, tooltipProps } from "@/components/charts";
+import { cn } from "@/lib/utils";
 
-const AFFECTED = "#ef4444";
-const TOTAL = "hsl(var(--border))";
+const AFFECTED = "hsl(var(--accent))";
+const TOTAL = "hsl(var(--strong) / 0.6)";
 
 export function FleetPanel({ caseId, refreshKey }: { caseId: string; refreshKey: unknown }) {
   const fleet = useAsync(() => api.fleet(caseId), [caseId, refreshKey], 5000);
   if (fleet.error && !fleet.data) return <ErrorState error={fleet.error} onRetry={fleet.reload} />;
   if (!fleet.data) return <div className="grid gap-4 lg:grid-cols-3">{[0, 1, 2].map((i) => <Skeleton key={i} className="h-56" />)}</div>;
   const f = fleet.data;
-  if (!f.total_vins) return <Empty title="No fleet analysis yet" hint="The Fleet Impact stage populates this view." />;
+  if (!f.total_vins) return <Card><Empty title="No fleet analysis yet" hint="The Fleet Impact stage populates this view." /></Card>;
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <Rollout f={f} />
-      <div className="grid gap-6 lg:grid-cols-3">
+      <div className="grid gap-5 lg:grid-cols-3">
         <Breakdown title="By region" data={f.by_region.map((r) => ({ name: r.region, affected: r.affected, total: r.total }))} />
         <Breakdown title="By SW version" data={f.by_version.map((r) => ({ name: r.sw_version, affected: r.affected, total: r.total }))} />
-        <Breakdown title="By min. ambient temperature" data={f.by_temp.map((r) => ({ name: r.bucket, affected: r.affected, total: r.total }))} />
+        <Breakdown title="By min. ambient" data={f.by_temp.map((r) => ({ name: r.bucket, affected: r.affected, total: r.total }))} />
       </div>
       <Card>
         <CardHeader title="Field health" description="Audio underruns per ignition across the cohort, before and after the OTA" />
         <CardBody>
           {f.health.length ? (
             <ResponsiveContainer width="100%" height={220}>
-              <LineChart data={f.health.map((h) => ({ ...h, label: new Date(h.t * 1000).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit" }) }))} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
+              <AreaChart data={f.health.map((h) => ({ ...h, label: new Date(h.t * 1000).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }) }))} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="fh" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0" stopColor="hsl(var(--accent))" stopOpacity={0.35} />
+                    <stop offset="1" stopColor="hsl(var(--accent))" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
                 {grid}
                 <XAxis dataKey="label" {...axis} minTickGap={40} />
                 <YAxis {...axis} axisLine={false} allowDecimals={false} />
                 <Tooltip {...tooltipProps} />
-                <Line type="monotone" dataKey="underruns" name="Underruns / boot" stroke="#2563eb" strokeWidth={1.75} dot={false} isAnimationActive={false} />
-              </LineChart>
+                <Area type="stepAfter" dataKey="underruns" name="Underruns / boot" stroke="hsl(var(--accent))" fill="url(#fh)" strokeWidth={1.75} isAnimationActive={false} />
+              </AreaChart>
             </ResponsiveContainer>
           ) : (
             <Empty title="No health reports yet" hint="hu-sentinel devices report health after each ignition cycle." />
@@ -45,7 +52,7 @@ export function FleetPanel({ caseId, refreshKey }: { caseId: string; refreshKey:
         <CardHeader title="Affected cohort" description={`${f.affected_vins} of ${f.total_vins} vehicles match the signature`} />
         <div className="max-h-[420px] overflow-y-auto">
           <Table>
-            <thead className="sticky top-0 bg-surface">
+            <thead className="sticky top-0 z-10">
               <tr>
                 <Th>VIN</Th>
                 <Th>Region</Th>
@@ -58,11 +65,11 @@ export function FleetPanel({ caseId, refreshKey }: { caseId: string; refreshKey:
             <tbody>
               {f.cohort.map((v) => (
                 <Tr key={v.vin}>
-                  <Td className="font-mono text-xs">{v.vin}</Td>
-                  <Td>{v.region}</Td>
-                  <Td className="font-mono text-xs">{v.sw_version}</Td>
-                  <Td className="tnum text-right">{v.min_temp_c.toFixed(1)} °C</Td>
-                  <Td className="tnum text-right">{v.underruns}</Td>
+                  <Td className="font-mono text-[12px]">{v.vin}</Td>
+                  <Td className="text-[12.5px]">{v.region}</Td>
+                  <Td className="font-mono text-[12px]">{v.sw_version}</Td>
+                  <Td className="tnum text-right font-mono text-[12px]">{v.min_temp_c.toFixed(1)} °C</Td>
+                  <Td className={cn("tnum text-right font-mono text-[12px]", v.underruns > 0 ? "text-accent" : "text-ok")}>{v.underruns}</Td>
                   <Td><OtaBadge status={v.ota_status} /></Td>
                 </Tr>
               ))}
@@ -77,37 +84,56 @@ export function FleetPanel({ caseId, refreshKey }: { caseId: string; refreshKey:
 function OtaBadge({ status }: { status: string }) {
   const s = status.toLowerCase();
   const tone = s === "succeeded" ? "ok" : s === "failed" ? "bad" : s === "in_progress" || s === "queued" ? "run" : "outline";
-  return <Badge tone={tone} className="capitalize">{s.replace(/_/g, " ") || "not targeted"}</Badge>;
+  return <Badge tone={tone}>{s.replace(/_/g, " ") || "not targeted"}</Badge>;
 }
 
+const CELLS = 80;
+
+/** Rollout as a discrete cell bar: each cell is 1/80 of the targeted cohort. */
 function Rollout({ f }: { f: Fleet }) {
   const r = f.rollout;
   const total = Math.max(1, r.targeted);
-  const seg = (n: number) => `${(n / total) * 100}%`;
+  const ok = Math.round((r.succeeded / total) * CELLS);
+  const run = Math.round((r.in_progress / total) * CELLS);
+  const bad = Math.round((r.failed / total) * CELLS);
+  const pct = r.targeted ? Math.round((r.succeeded / total) * 100) : 0;
+  const stats: [string, number, string][] = [
+    ["Affected", f.affected_vins, "text-fg"],
+    ["Targeted", r.targeted, "text-fg"],
+    ["Succeeded", r.succeeded, "text-ok"],
+    ["In progress", r.in_progress, "text-run"],
+    ["Failed", r.failed, r.failed ? "text-bad" : "text-faint"],
+  ];
   return (
     <Card>
       <CardHeader title="OTA rollout" description={r.targeted ? `Wave: ${r.wave}` : "Not started. Rollout begins after release approval."} />
-      <CardBody>
-        <div className="grid grid-cols-2 gap-px overflow-hidden rounded border border-border bg-border md:grid-cols-5">
-          {[
-            ["Affected", f.affected_vins],
-            ["Targeted", r.targeted],
-            ["Succeeded", r.succeeded],
-            ["In progress", r.in_progress],
-            ["Failed", r.failed],
-          ].map(([k, v]) => (
-            <div key={k} className="bg-surface px-3 py-2.5">
-              <div className="text-xs text-muted">{k}</div>
-              <div className="tnum text-xl font-semibold">{v}</div>
-            </div>
-          ))}
+      <div className="grid gap-6 p-4 lg:grid-cols-[220px_1fr]">
+        <div>
+          <div className="label">Fleet repaired</div>
+          <div className="tnum mt-1 text-[44px] font-light leading-none tracking-[-0.04em]">
+            {pct}<span className="ml-0.5 text-[22px] text-muted">%</span>
+          </div>
+          <div className="mt-2 font-mono text-2xs uppercase tracking-[0.06em] text-faint">{r.succeeded} of {r.targeted || f.affected_vins} vehicles</div>
         </div>
-        <div className="mt-4 flex h-2 overflow-hidden rounded-full bg-subtle">
-          <div className="bg-ok" style={{ width: seg(r.succeeded) }} />
-          <div className="animate-pulseSoft bg-run" style={{ width: seg(r.in_progress) }} />
-          <div className="bg-bad" style={{ width: seg(r.failed) }} />
+        <div className="min-w-0">
+          <div className="grid gap-[3px]" style={{ gridTemplateColumns: `repeat(${CELLS / 2}, minmax(0, 1fr))` }}>
+            {Array.from({ length: CELLS }, (_, i) => (
+              <span
+                key={i}
+                className={cn("h-3 rounded-[1px]", i < ok ? "bg-ok" : i < ok + run ? "animate-pulseSoft bg-run" : i < ok + run + bad ? "bg-bad" : "bg-subtle")}
+              />
+            ))}
+          </div>
+          <dl className="mt-4 grid grid-cols-5 divide-x divide-border border-t border-border pt-3">
+            {stats.map(([k, v, cls]) => (
+              <div key={k} className="px-3 first:pl-0">
+                <dt className="label">{k}</dt>
+                <dd className={cn("tnum mt-0.5 font-mono text-[18px]", cls)}>{v}</dd>
+              </div>
+            ))}
+          </dl>
         </div>
-      </CardBody>
+      </div>
     </Card>
   );
 }
@@ -121,12 +147,12 @@ function Breakdown({ title, data }: { title: string; data: { name: string; affec
           <ResponsiveContainer width="100%" height={200}>
             <BarChart data={data.map((d) => ({ ...d, unaffected: Math.max(0, d.total - d.affected) }))} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
               {grid}
-              <XAxis dataKey="name" {...axis} interval={0} fontSize={10} />
+              <XAxis dataKey="name" {...axis} interval={0} />
               <YAxis {...axis} axisLine={false} allowDecimals={false} />
               <Tooltip {...tooltipProps} />
               {legend}
-              <Bar dataKey="affected" name="Affected" stackId="a" fill={AFFECTED} maxBarSize={28} isAnimationActive={false} />
-              <Bar dataKey="unaffected" name="Not affected" stackId="a" fill={TOTAL} radius={[2, 2, 0, 0]} maxBarSize={28} isAnimationActive={false} />
+              <Bar dataKey="affected" name="Affected" stackId="a" fill={AFFECTED} maxBarSize={22} isAnimationActive={false} />
+              <Bar dataKey="unaffected" name="Not affected" stackId="a" fill={TOTAL} radius={[1, 1, 0, 0]} maxBarSize={22} isAnimationActive={false} />
             </BarChart>
           </ResponsiveContainer>
         ) : (

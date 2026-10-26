@@ -1,8 +1,5 @@
 import {
-  CheckCircle2,
-  CircleDashed,
-  CircleSlash,
-  Clock3,
+  Check,
   Cpu,
   Database,
   ExternalLink,
@@ -10,13 +7,12 @@ import {
   Github,
   Globe,
   Hash,
-  Loader2,
   MessageSquare,
   Radio,
   Server,
   ShieldCheck,
   Ticket,
-  XCircle,
+  X,
 } from "lucide-react";
 import type { CaseStatus, Link, SignalSource, StageDef, StageRun, StageStatus } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -41,87 +37,118 @@ const STATUS_TONE: Record<StageStatus, "neutral" | "run" | "ok" | "bad" | "warn"
   skipped: "neutral",
 };
 
-export function StatusIcon({ status, size = 14, className }: { status: StageStatus; size?: number; className?: string }) {
-  const c = cn("shrink-0", className);
+/** Text colour class per stage status. */
+export const STATUS_TEXT: Record<StageStatus, string> = {
+  pending: "text-faint",
+  running: "text-run",
+  passed: "text-ok",
+  failed: "text-bad",
+  awaiting_approval: "text-warn",
+  skipped: "text-faint",
+};
+
+/** Small geometric status glyph: square = stage, filled = done, pulsing = live. */
+export function StatusIcon({ status, size = 12, className }: { status: StageStatus; size?: number; className?: string }) {
+  const box = cn("inline-flex shrink-0 items-center justify-center rounded-[2px]", className);
+  const s = { width: size, height: size };
   switch (status) {
     case "passed":
-      return <CheckCircle2 size={size} className={cn(c, "text-ok")} />;
-    case "running":
-      return <Loader2 size={size} className={cn(c, "animate-spin text-run")} />;
+      return <span className={cn(box, "bg-ok text-bg")} style={s}><Check size={size - 3} strokeWidth={3.25} /></span>;
     case "failed":
-      return <XCircle size={size} className={cn(c, "text-bad")} />;
+      return <span className={cn(box, "bg-bad text-bg")} style={s}><X size={size - 3} strokeWidth={3.25} /></span>;
+    case "running":
+      return (
+        <span className={cn(box, "border border-run")} style={s}>
+          <span className="animate-pulseSoft rounded-[1px] bg-run" style={{ width: size / 2, height: size / 2 }} />
+        </span>
+      );
     case "awaiting_approval":
-      return <Clock3 size={size} className={cn(c, "text-warn")} />;
+      return (
+        <span className={cn(box, "animate-pulseSoft")} style={s}>
+          <span className="rotate-45 rounded-[1px] bg-warn" style={{ width: size * 0.66, height: size * 0.66 }} />
+        </span>
+      );
     case "skipped":
-      return <CircleSlash size={size} className={cn(c, "text-muted")} />;
+      return <span className={cn(box, "border border-dashed border-faint")} style={s} />;
     default:
-      return <CircleDashed size={size} className={cn(c, "text-muted/70")} />;
+      return <span className={cn(box, "border border-strong")} style={s} />;
   }
 }
 
 export function StageStatusChip({ status }: { status: StageStatus }) {
   return (
     <Badge tone={STATUS_TONE[status]}>
-      <StatusIcon status={status} size={12} />
+      <StatusIcon status={status} size={9} />
       {STATUS_LABEL[status]}
     </Badge>
   );
 }
 
-const CASE_STATUS: Record<CaseStatus, { label: string; tone: "neutral" | "run" | "ok" | "bad" | "warn" | "accent" }> = {
+const CASE_STATUS: Record<CaseStatus, { label: string; tone: "neutral" | "run" | "ok" | "bad" | "warn" | "accent" | "info" }> = {
   open: { label: "Open", tone: "neutral" },
   running: { label: "Pipeline running", tone: "run" },
   awaiting_approval: { label: "Awaiting approval", tone: "warn" },
-  releasing: { label: "Releasing", tone: "accent" },
+  releasing: { label: "Releasing", tone: "info" },
   closed: { label: "Closed", tone: "ok" },
   failed: { label: "Failed", tone: "bad" },
 };
 
 export function CaseStatusChip({ status }: { status: CaseStatus }) {
   const s = CASE_STATUS[status] ?? { label: status, tone: "neutral" as const };
+  const live = status === "running" || status === "awaiting_approval" || status === "releasing";
   return (
     <Badge tone={s.tone}>
-      {status === "running" && <span className="h-1.5 w-1.5 animate-pulseSoft rounded-full bg-run" />}
+      <span className={cn("h-1.5 w-1.5 rounded-full bg-current", live && "animate-pulseSoft")} />
       {s.label}
     </Badge>
   );
 }
 
+const SEVERITY_LEVEL: Record<string, number> = { low: 1, medium: 2, high: 3, critical: 4 };
+
+/** Severity as a 4-step meter plus label, readable at a glance in dense tables. */
 export function SeverityBadge({ severity }: { severity: string | null | undefined }) {
-  if (!severity) return <span className="text-muted">—</span>;
-  const tone = severity === "critical" || severity === "high" ? "bad" : severity === "medium" ? "warn" : "neutral";
+  if (!severity) return <span className="text-faint">—</span>;
+  const lvl = SEVERITY_LEVEL[severity] ?? 1;
+  const color = lvl >= 3 ? "bg-bad" : lvl === 2 ? "bg-warn" : "bg-muted";
   return (
-    <Badge tone={tone} className="capitalize">
-      {severity}
-    </Badge>
+    <span className="inline-flex items-center gap-2 font-mono text-2xs uppercase tracking-[0.06em]">
+      <span className="flex items-end gap-[2px]">
+        {[1, 2, 3, 4].map((i) => (
+          <span key={i} className={cn("w-[3px] rounded-[1px]", i <= lvl ? color : "bg-border")} style={{ height: 4 + i * 2 }} />
+        ))}
+      </span>
+      <span className={lvl >= 3 ? "text-bad" : lvl === 2 ? "text-warn" : "text-muted"}>{severity}</span>
+    </span>
   );
 }
 
 export const SOURCE_META: Record<SignalSource, { label: string; icon: typeof Globe; color: string }> = {
-  reddit: { label: "Reddit", icon: MessageSquare, color: "#f97316" },
-  forum: { label: "Owners forum", icon: Globe, color: "#0ea5e9" },
-  x: { label: "X", icon: Hash, color: "#64748b" },
-  issuetracker: { label: "Issue Tracker", icon: Ticket, color: "#8b5cf6" },
-  partner_jira: { label: "Partner Jira", icon: Ticket, color: "#14b8a6" },
-  device: { label: "hu-sentinel", icon: Cpu, color: "#2563eb" },
+  reddit: { label: "Reddit", icon: MessageSquare, color: "#ff8a5b" },
+  forum: { label: "Owners forum", icon: Globe, color: "#4cc9f0" },
+  x: { label: "X", icon: Hash, color: "#a3abb8" },
+  issuetracker: { label: "Issue Tracker", icon: Ticket, color: "#9d8cff" },
+  partner_jira: { label: "Partner Jira", icon: Ticket, color: "#2dd4bf" },
+  device: { label: "hu-sentinel", icon: Cpu, color: "#f7c948" },
 };
 
 export const SOURCES = Object.keys(SOURCE_META) as SignalSource[];
 
 export function SourceBadge({ source }: { source: SignalSource }) {
-  const m = SOURCE_META[source] ?? { label: source, icon: Radio, color: "#64748b" };
+  const m = SOURCE_META[source] ?? { label: source, icon: Radio, color: "#888" };
   const Icon = m.icon;
   return (
-    <span className="inline-flex h-5 items-center gap-1.5 whitespace-nowrap rounded border border-border bg-surface px-1.5 text-xs font-medium">
-      <span className="h-1.5 w-1.5 rounded-full" style={{ background: m.color }} />
-      <Icon size={12} className="text-muted" />
+    <span className="inline-flex h-5 items-center gap-1.5 whitespace-nowrap font-mono text-2xs uppercase tracking-[0.05em] text-fg">
+      <span className="flex h-5 w-5 items-center justify-center rounded-sm" style={{ background: `${m.color}1f`, color: m.color }}>
+        <Icon size={11} strokeWidth={2} />
+      </span>
       {m.label}
     </span>
   );
 }
 
-export function ToolIcon({ tool, size = 14 }: { tool: string; size?: number }) {
-  const p = { size, className: "shrink-0 text-muted" };
+export function ToolIcon({ tool, size = 14, className }: { tool: string; size?: number; className?: string }) {
+  const p = { size, className: cn("shrink-0 text-muted", className) };
   switch (tool) {
     case "github":
       return <Github {...p} />;
@@ -156,35 +183,40 @@ export function LinkChip({ link }: { link: Link }) {
       href={link.url}
       target="_blank"
       rel="noreferrer"
-      className="inline-flex h-6 items-center gap-1.5 rounded border border-border bg-surface px-2 text-xs font-medium hover:border-accent/40 hover:text-accent"
+      className="group inline-flex h-7 items-center gap-2 rounded border border-border bg-surface pl-2 pr-2.5 text-xs font-medium transition-colors hover:border-accent/50"
     >
-      <ToolIcon tool={link.tool} size={12} />
-      {link.label}
+      <ToolIcon tool={link.tool} size={13} className="group-hover:text-accent" />
+      <span className="font-mono text-2xs uppercase tracking-[0.06em] text-faint">{link.tool}</span>
+      <span className="max-w-[260px] truncate">{link.label}</span>
     </a>
   );
 }
 
-const DOT: Record<StageStatus, string> = {
+const SEG: Record<StageStatus, string> = {
   pending: "bg-border",
   running: "bg-run animate-pulseSoft",
   passed: "bg-ok",
   failed: "bg-bad",
-  awaiting_approval: "bg-warn",
-  skipped: "bg-muted/40",
+  awaiting_approval: "bg-warn animate-pulseSoft",
+  skipped: "bg-faint/40",
 };
 
-/** Compact 12-dot progress strip for tables. */
+/** Compact 12-segment progress tape for tables. */
 export function StageStrip({ stages, runs }: { stages: StageDef[]; runs: Partial<Record<string, StageStatus>> }) {
+  const done = stages.filter((s) => runs[s.key] === "passed").length;
   return (
-    <div className="flex items-center gap-1">
-      {stages.map((s) => {
-        const st = runs[s.key] ?? "pending";
-        return (
-          <Tip key={s.key} content={`${s.name} · ${STATUS_LABEL[st]}`}>
-            <span className={cn("h-2 w-2 rounded-full", DOT[st])} />
-          </Tip>
-        );
-      })}
+    <div className="flex items-center gap-2.5">
+      <div className="flex items-center gap-[2px]">
+        {stages.map((s, i) => {
+          const st = runs[s.key] ?? "pending";
+          return (
+            <Tip key={s.key} content={`${String(i + 1).padStart(2, "0")} ${s.name} · ${STATUS_LABEL[st]}`}>
+              <span className={cn("h-[14px] w-[7px] rounded-[1px]", SEG[st])} />
+            </Tip>
+          );
+        })}
+      </div>
+      <span className="tnum font-mono text-2xs text-faint">{String(done).padStart(2, "0")}/{stages.length}</span>
     </div>
   );
 }

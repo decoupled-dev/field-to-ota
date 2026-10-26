@@ -3,12 +3,13 @@ import { api, type Integration } from "@/lib/api";
 import { useAsync } from "@/lib/hooks";
 import { useApp } from "@/lib/context";
 import { PageBody, PageHeader } from "@/components/layout/Page";
-import { Card, CardHeader } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Modal, ModalClose } from "@/components/ui/sheet";
 import { Empty, ErrorState, Skeleton } from "@/components/ui/states";
 import { ToolIcon } from "@/components/domain";
+import { cn } from "@/lib/utils";
 
 const GROUPS: { capability: string; title: string; description: string }[] = [
   { capability: "signal_source", title: "Signal sources", description: "Where field signals come from" },
@@ -33,6 +34,7 @@ export default function IntegrationsPage() {
   const ints = useAsync(api.integrations, []);
   const { stages } = useApp();
   const [cfg, setCfg] = useState<Integration | null>(null);
+  const stageIndex = (k: string) => stages.findIndex((s) => s.key === k);
   const stageName = (k: string) => stages.find((s) => s.key === k)?.name ?? k;
 
   const groups = useMemo(() => {
@@ -43,9 +45,18 @@ export default function IntegrationsPage() {
     return known.filter((g) => g.items.length);
   }, [ints.data]);
 
+  const totals = useMemo(() => {
+    const d = ints.data ?? [];
+    return { connected: d.filter((i) => i.status === "connected").length, simulated: d.filter((i) => i.status === "simulated").length, available: d.filter((i) => i.status === "available").length };
+  }, [ints.data]);
+
   return (
     <PageBody>
-      <PageHeader title="Integrations" description="Every stage calls a connector through a capability interface. Swap in your OEM toolchain without changing the pipeline." />
+      <PageHeader
+        eyebrow={ints.data ? <><span className="text-ok">{totals.connected} connected</span> · <span className="text-warn">{totals.simulated} simulated</span> · {totals.available} available</> : "Toolchain"}
+        title="Integrations"
+        description="Every stage calls a connector through a capability interface. Swap in the OEM toolchain without changing the pipeline."
+      />
       {ints.error && !ints.data ? (
         <ErrorState error={ints.error} onRetry={ints.reload} />
       ) : !ints.data ? (
@@ -53,51 +64,59 @@ export default function IntegrationsPage() {
       ) : !groups.length ? (
         <Card><Empty title="No connectors registered" /></Card>
       ) : (
-        <div className="space-y-6">
+        <div className="space-y-px overflow-hidden rounded-md border border-border bg-border">
           {groups.map((g) => (
-            <Card key={g.capability}>
-              <CardHeader title={g.title} description={g.description} />
-              <div className="grid gap-px bg-border sm:grid-cols-2 xl:grid-cols-3">
+            <section key={g.capability} className="grid bg-surface lg:grid-cols-[240px_1fr]">
+              <div className="border-b border-border px-4 py-4 lg:border-b-0 lg:border-r">
+                <div className="font-mono text-2xs font-medium uppercase tracking-[0.09em] text-fg">{g.title}</div>
+                <div className="mt-1 text-xs leading-5 text-muted">{g.description}</div>
+                <div className="mt-2 font-mono text-[10px] text-faint">{g.capability}</div>
+              </div>
+              <div className="grid sm:grid-cols-2 2xl:grid-cols-3">
                 {g.items.map((i) => (
-                  <div key={i.key} className="flex flex-col bg-surface p-4">
+                  <div key={i.key} className="flex flex-col bg-surface p-4 shadow-[inset_-1px_-1px_0_hsl(var(--border))]">
                     <div className="flex items-start gap-3">
-                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded border border-border bg-subtle">
-                        <ToolIcon tool={i.key.split("_")[0]} size={16} />
+                      <div className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded border bg-raised", i.status === "connected" ? "border-ok/40" : "border-border")}>
+                        <ToolIcon tool={i.key.split("_")[0]} size={16} className={i.status === "connected" ? "text-ok" : undefined} />
                       </div>
                       <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <span className="truncate text-sm font-semibold">{i.name}</span>
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="truncate text-[13.5px] font-semibold">{i.name}</span>
                           <Badge tone={STATUS[i.status]?.tone ?? "outline"}>{STATUS[i.status]?.label ?? i.status}</Badge>
                         </div>
-                        <div className="text-xs text-muted">{i.vendor}</div>
+                        <div className="font-mono text-2xs uppercase tracking-[0.05em] text-faint">{i.vendor}</div>
                       </div>
                     </div>
-                    <p className="mt-2 flex-1 text-xs leading-5 text-muted">{i.description}</p>
-                    <div className="mt-3 flex items-center gap-2">
+                    <p className="mt-2.5 flex-1 text-xs leading-5 text-muted">{i.description}</p>
+                    <div className="mt-3 flex items-end gap-2">
                       <div className="flex min-w-0 flex-1 flex-wrap gap-1">
-                        {i.stages.map((s) => <span key={s} className="rounded bg-subtle px-1.5 py-px text-[11px] text-muted">{stageName(s)}</span>)}
+                        {i.stages.map((s) => (
+                          <span key={s} className="rounded-sm border border-border px-1.5 py-px font-mono text-[10px] text-muted">
+                            <span className="text-faint">{String(stageIndex(s) + 1).padStart(2, "0")}</span> {stageName(s)}
+                          </span>
+                        ))}
                       </div>
-                      <Button size="sm" variant="secondary" onClick={() => setCfg(i)}>Configure</Button>
+                      <Button size="sm" variant="ghost" onClick={() => setCfg(i)}>Configure</Button>
                     </div>
                   </div>
                 ))}
               </div>
-            </Card>
+            </section>
           ))}
         </div>
       )}
       <Modal open={!!cfg} onOpenChange={(o) => !o && setCfg(null)} title={cfg ? `Configure ${cfg.name}` : ""} description="Credentials are stored in AWS Secrets Manager. Values are read by the connector at runtime.">
         {cfg && (
-          <div className="space-y-3">
-            <dl className="divide-y divide-border rounded border border-border text-sm">
+          <div className="space-y-4">
+            <dl className="divide-y divide-border overflow-hidden rounded border border-border">
               {(cfg.config_keys?.length ? cfg.config_keys : [`${cfg.key.toUpperCase()}_URL`, `${cfg.key.toUpperCase()}_TOKEN`]).map((k) => (
                 <div key={k} className="flex items-center justify-between gap-3 px-3 py-2">
-                  <dt className="font-mono text-xs">{k}</dt>
-                  <dd className="text-xs text-muted">{cfg.status === "connected" ? "set" : "not set"}</dd>
+                  <dt className="font-mono text-[12px]">{k}</dt>
+                  <dd className={cn("font-mono text-2xs uppercase tracking-[0.06em]", cfg.status === "connected" ? "text-ok" : "text-faint")}>{cfg.status === "connected" ? "set" : "not set"}</dd>
                 </div>
               ))}
             </dl>
-            <div className="text-xs text-muted">Capability: <span className="font-mono">{cfg.capability}</span></div>
+            <div className="font-mono text-2xs uppercase tracking-[0.06em] text-faint">Capability · <span className="text-fg">{cfg.capability}</span></div>
             <div className="flex justify-end">
               <ModalClose asChild><Button size="sm" variant="secondary">Close</Button></ModalClose>
             </div>

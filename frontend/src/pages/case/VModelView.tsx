@@ -1,164 +1,184 @@
-import { useEffect, useRef, useState } from "react";
-import type { StageDef, StageRun } from "@/lib/api";
+import type { StageDef, StageRun, StageStatus } from "@/lib/api";
 import { STATUS_LABEL } from "@/components/domain";
-import { cn } from "@/lib/utils";
-import { StageCard } from "./PipelineGraph";
+import { fmtDuration } from "@/lib/utils";
 
-// Canvas coordinates (card centers). The V runs from Requirements (top-left) down to
-// Implementation (bottom) and back up to Vehicle release (top-right). Field stages sit
-// above the V: the loop starts and ends in the field.
-const CW = 1340;
-const CH = 580;
-const CARD_W = 168;
-const ROW = { field: 70, d1: 178, d2: 288, d3: 398, d4: 500 };
+// Schematic of the V-model drawn on a fixed canvas and scaled by the viewBox.
+// The case enters from the field (top band), descends the right side while it is diagnosed,
+// crosses to the left at root cause, goes down to implementation and climbs the right side
+// back to the vehicle, where monitoring closes the loop.
+const W = 1140;
+const H = 500;
+const Y = { field: 58, l1: 150, l2: 248, l3: 346, l4: 440 };
+const TOP_L: P = [190, Y.l1];
+const BOTTOM: P = [530, Y.l4];
+const TOP_R: P = [870, Y.l1];
+const R = 16;
 
-const POS: Record<string, [number, number]> = {
-  monitor: [520, ROW.field],
-  detect: [700, ROW.field],
-  triage: [880, ROW.field],
-  ticket: [1060, ROW.field],
-  fleet: [1120, ROW.d1],
-  reproduce: [1010, ROW.d2],
-  rca: [330, ROW.d2],
-  requirement: [200, ROW.d1],
-  fix: [600, ROW.d4],
-  verify: [720, ROW.d3],
-  approve: [868, 330],
-  release: [930, ROW.d1],
+type P = [number, number];
+type Side = "left" | "right" | "above" | "below";
+
+const POS: Record<string, { p: P; label: Side }> = {
+  detect: { p: [490, Y.field], label: "above" },
+  triage: { p: [610, Y.field], label: "above" },
+  ticket: { p: [730, Y.field], label: "above" },
+  fleet: { p: [690, Y.l1], label: "right" },
+  reproduce: { p: [580, Y.l2], label: "right" },
+  rca: { p: [305, Y.l2], label: "left" },
+  requirement: { p: TOP_L, label: "above" },
+  fix: { p: BOTTOM, label: "below" },
+  verify: { p: [640, Y.l3], label: "right" },
+  approve: { p: [755, Y.l2], label: "right" },
+  release: { p: TOP_R, label: "right" },
+  monitor: { p: [870, Y.field], label: "right" },
 };
 
-const V_PATH = `M ${200} ${ROW.d1} L ${600} ${ROW.d4} L ${930} ${ROW.d1}`;
-
-const LEVELS: { y: number; left: string; right: string }[] = [
-  { y: ROW.field, left: "", right: "" },
-  { y: ROW.d1, left: "Requirements", right: "Vehicle validation" },
-  { y: ROW.d2, left: "Architecture & design", right: "System integration" },
-  { y: ROW.d3, left: "Detailed design", right: "Unit & integration test" },
-  { y: ROW.d4, left: "Implementation", right: "" },
+const LEVELS: { y: number; left?: string; right?: string }[] = [
+  { y: Y.l1, left: "Requirements", right: "Vehicle validation" },
+  { y: Y.l2, left: "Architecture", right: "System integration" },
+  { y: Y.l3, left: "Detailed design", right: "Unit / integration test" },
+  { y: Y.l4, left: "Implementation" },
 ];
 
-function edgeColor(a?: StageRun, b?: StageRun) {
-  if (a?.status === "passed" && (b?.status === "running" || b?.status === "awaiting_approval")) return "hsl(var(--run))";
-  if (a?.status === "passed" && b && b.status !== "pending") return "hsl(var(--ok))";
-  return "hsl(var(--muted) / 0.45)";
-}
+const TONE: Record<StageStatus, { stroke: string; fill: string; text: string }> = {
+  pending: { stroke: "hsl(var(--strong))", fill: "hsl(var(--surface))", text: "hsl(var(--faint))" },
+  skipped: { stroke: "hsl(var(--strong))", fill: "hsl(var(--surface))", text: "hsl(var(--faint))" },
+  running: { stroke: "hsl(var(--run))", fill: "hsl(var(--run) / 0.14)", text: "hsl(var(--run))" },
+  passed: { stroke: "hsl(var(--ok))", fill: "hsl(var(--ok) / 0.12)", text: "hsl(var(--ok))" },
+  awaiting_approval: { stroke: "hsl(var(--warn))", fill: "hsl(var(--warn) / 0.16)", text: "hsl(var(--warn))" },
+  failed: { stroke: "hsl(var(--bad))", fill: "hsl(var(--bad) / 0.14)", text: "hsl(var(--bad))" },
+};
+
+const isLive = (s?: StageStatus) => s === "running" || s === "awaiting_approval";
 
 export function VModelView({ stages, runs, selected, onSelect }: { stages: StageDef[]; runs: Record<string, StageRun>; selected: string | null; onSelect: (k: string) => void }) {
-  // Unknown (future) stages get a fallback slot along the bottom so the view stays extensible.
+  // Unknown (future) stages get a slot along the bottom-left so the view stays extensible.
   let extra = 0;
-  const pos = (k: string): [number, number] => POS[k] ?? [90 + extra++ * 170, CH - 30];
-  const placed = stages.map((s) => ({ s, p: pos(s.key) }));
-
-  // Scale the fixed canvas down to the available width so nothing is clipped.
-  const wrap = useRef<HTMLDivElement>(null);
-  const [scale, setScale] = useState(1);
-  useEffect(() => {
-    const el = wrap.current;
-    if (!el) return;
-    const ro = new ResizeObserver(([e]) => setScale(Math.min(1, e.contentRect.width / CW)));
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
+  const placed = stages.map((s, i) => ({ s, i, ...(POS[s.key] ?? { p: [60 + extra++ * 60, H - 24] as P, label: "above" as Side }) }));
 
   return (
-    <div ref={wrap} className="w-full" style={{ height: CH * scale }}>
-      <div className="relative origin-top-left" style={{ width: CW, height: CH, transform: `scale(${scale})` }}>
-        <svg width={CW} height={CH} className="absolute inset-0">
-          <defs>
-            <marker id="vm-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-              <path d="M0,0 L10,5 L0,10 z" fill="context-stroke" />
-            </marker>
-          </defs>
-          {/* field band */}
-          <rect x={420} y={ROW.field - 38} width={744} height={76} rx={8} fill="hsl(var(--subtle) / 0.6)" stroke="hsl(var(--border))" strokeDasharray="4 4" />
-          <text x={430} y={ROW.field - 46} className="fill-muted" fontSize={11} fontWeight={500} letterSpacing={0.8}>FIELD</text>
-          {/* the V */}
-          <path d={V_PATH} fill="none" stroke="hsl(var(--subtle))" strokeWidth={46} strokeLinejoin="round" strokeLinecap="round" />
-          <path d={V_PATH} fill="none" stroke="hsl(var(--border))" strokeWidth={1} strokeDasharray="2 4" />
-          {LEVELS.map((l) => (
-            <g key={l.y}>
-              {l.left && <text x={16} y={l.y + 4} fontSize={11} className="fill-muted">{l.left}</text>}
-              {l.right && <text x={CW - 16} y={l.y + 4} fontSize={11} textAnchor="end" className="fill-muted">{l.right}</text>}
-              {l.left && <line x1={16} x2={120} y1={l.y + 12} y2={l.y + 12} stroke="hsl(var(--border))" />}
-            </g>
-          ))}
-          <text x={600} y={ROW.d4 + 62} fontSize={11} textAnchor="middle" className="fill-muted">Left side: specify & build · Right side: verify & validate</text>
-          {/* flow */}
-          {placed.slice(1).map(({ s, p }, i) => {
-            const prev = placed[i];
-            const [x1, y1] = prev.p;
-            const [x2, y2] = p;
-            const dx = x2 - x1;
-            const dy = y2 - y1;
-            const len = Math.hypot(dx, dy) || 1;
-            // trim to card edges (approximate as ellipse around the card)
-            const trim = (ux: number, uy: number) => {
-              const tx = Math.abs(ux) > 1e-6 ? (CARD_W / 2 + 6) / Math.abs(ux) : Infinity;
-              const ty = Math.abs(uy) > 1e-6 ? 36 / Math.abs(uy) : Infinity;
-              return Math.min(tx, ty);
-            };
-            const ux = dx / len;
-            const uy = dy / len;
-            const t = trim(ux, uy);
-            const sx = x1 + ux * t;
-            const sy = y1 + uy * t;
-            const ex = x2 - ux * t;
-            const ey = y2 - uy * t;
-            const stroke = edgeColor(runs[prev.s.key], runs[s.key]);
-            const cross = s.key === "rca";
-            const outer = prev.s.key === "requirement" && s.key === "fix";
-            const d = cross
-              ? `M ${sx} ${sy} C ${sx - 160} ${sy - 110}, ${ex + 160} ${ey - 110}, ${ex} ${ey}`
-              : outer
-                ? `M ${x1 - 40} ${y1 + 30} L ${x1 - 40} ${y2} L ${x2 - CARD_W / 2 - 6} ${y2}`
-                : `M ${sx} ${sy} L ${ex} ${ey}`;
-            return (
-              <g key={s.key}>
-                <path d={d} fill="none" stroke={stroke} strokeWidth={1.5} markerEnd="url(#vm-arrow)" strokeDasharray={runs[s.key]?.status === "pending" ? "4 4" : undefined} />
-                {cross && (
-                  <text x={(sx + ex) / 2} y={Math.min(sy, ey) - 90} fontSize={11} textAnchor="middle" className="fill-muted">
-                    root cause crosses to the left side
-                  </text>
-                )}
-              </g>
-            );
-          })}
-        </svg>
-        {placed.map(({ s, p }, i) =>
-          s.v_side === "gate" ? (
-            <Gate key={s.key} def={s} run={runs[s.key]} x={p[0]} y={p[1]} selected={selected === s.key} onSelect={onSelect} />
-          ) : (
-            <div key={s.key} className="absolute" style={{ left: p[0] - CARD_W / 2, top: p[1] - 29, width: CARD_W }}>
-              <StageCard def={s} run={runs[s.key]} index={i} selected={selected === s.key} onSelect={onSelect} compact />
-            </div>
-          ),
-        )}
-      </div>
-    </div>
+    <svg viewBox={`0 0 ${W} ${H}`} className="block h-auto w-full select-none" role="img" aria-label="V-model view of the pipeline">
+      <defs>
+        <marker id="vm-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="context-stroke" />
+        </marker>
+        <linearGradient id="vm-band" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="hsl(var(--fg))" stopOpacity="0.07" />
+          <stop offset="1" stopColor="hsl(var(--fg))" stopOpacity="0.025" />
+        </linearGradient>
+      </defs>
+
+      {/* level rules and gutter labels */}
+      {LEVELS.map((l) => (
+        <g key={l.y}>
+          <line x1={12} x2={W - 12} y1={l.y} y2={l.y} stroke="hsl(var(--border))" strokeDasharray="1 5" />
+          {l.left && <text x={12} y={l.y - 8} fontSize={10.5} className="fill-faint font-mono uppercase" letterSpacing={1}>{l.left}</text>}
+          {l.right && <text x={W - 12} y={l.y - 8} fontSize={10.5} textAnchor="end" className="fill-faint font-mono uppercase" letterSpacing={1}>{l.right}</text>}
+        </g>
+      ))}
+
+      {/* field band */}
+      <rect x={420} y={14} width={580} height={84} rx={4} fill="hsl(var(--accent) / 0.04)" stroke="hsl(var(--accent) / 0.35)" strokeDasharray="3 4" />
+      <text x={408} y={Y.field + 3} fontSize={9.5} textAnchor="end" className="fill-accent font-mono uppercase" letterSpacing={1.2}>Field ▸</text>
+
+      {/* the V */}
+      <path d={`M ${TOP_L} L ${BOTTOM} L ${TOP_R}`} fill="none" stroke="url(#vm-band)" strokeWidth={44} strokeLinejoin="round" strokeLinecap="round" />
+      <path d={`M ${TOP_L} L ${BOTTOM} L ${TOP_R}`} fill="none" stroke="hsl(var(--strong))" strokeWidth={1} strokeDasharray="1 4" />
+      <text x={(TOP_L[0] + BOTTOM[0]) / 2 - 120} y={Y.l4 + 28} fontSize={9.5} className="fill-faint font-mono uppercase" letterSpacing={1}>◂ specify &amp; build</text>
+      <text x={(TOP_R[0] + BOTTOM[0]) / 2 + 120} y={Y.l4 + 28} fontSize={9.5} textAnchor="end" className="fill-faint font-mono uppercase" letterSpacing={1}>verify &amp; validate ▸</text>
+
+      {/* flow */}
+      {placed.slice(1).map((cur, k) => {
+        const prev = placed[k];
+        const a = runs[prev.s.key]?.status;
+        const b = runs[cur.s.key]?.status;
+        const active = a === "passed" && isLive(b);
+        const done = a === "passed" && !!b && b !== "pending" && !active;
+        const stroke = active ? "hsl(var(--run))" : done ? "hsl(var(--ok) / 0.75)" : "hsl(var(--faint) / 0.55)";
+        const d = edgePath(prev.s.key, cur.s.key, prev.p, cur.p);
+        return (
+          <g key={cur.s.key}>
+            <path d={d} fill="none" stroke={stroke} strokeWidth={active ? 2 : 1.5} strokeDasharray={active ? "6 6" : done ? undefined : "3 4"} className={active ? "svg-flow" : undefined} markerEnd="url(#vm-arrow)" />
+            {cur.s.key === "rca" && (
+              <text x={(prev.p[0] + cur.p[0]) / 2} y={cur.p[1] - 10} fontSize={9.5} textAnchor="middle" className="fill-faint font-mono uppercase" letterSpacing={1}>
+                root cause crosses to the left
+              </text>
+            )}
+          </g>
+        );
+      })}
+
+      {/* nodes */}
+      {placed.map(({ s, i, p, label }) => (
+        <Node key={s.key} def={s} index={i} run={runs[s.key]} p={p} side={label} selected={selected === s.key} onSelect={onSelect} />
+      ))}
+    </svg>
   );
 }
 
-const GATE_TONE: Record<string, string> = {
-  passed: "border-ok bg-ok/10",
-  awaiting_approval: "border-warn bg-warn/15 ring-4 ring-warn/15",
-  failed: "border-bad bg-bad/10",
-  running: "border-run bg-run/10",
-};
+/** Straight edge trimmed to the node rims; requirement → fix bows inward so it doesn't retrace the left arm. */
+function edgePath(from: string, to: string, a: P, b: P): string {
+  if (from === "requirement" && to === "fix") {
+    // Parallel lane on the inner side of the left arm.
+    const len = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+    const off: P = [((b[1] - a[1]) / len) * 15, (-(b[0] - a[0]) / len) * 15];
+    const sa: P = [a[0] + off[0], a[1] + off[1]];
+    const sb: P = [b[0] + off[0], b[1] + off[1]];
+    return `M ${toward(sa, sb, R + 2)} L ${toward(sb, sa, R + 4)}`;
+  }
+  return `M ${toward(a, b, R + 4)} L ${toward(b, a, R + 6)}`;
+}
 
-/** Release gate drawn as a diamond marker rather than a stage card. */
-function Gate({ def, run, x, y, selected, onSelect }: { def: StageDef; run?: StageRun; x: number; y: number; selected: boolean; onSelect: (k: string) => void }) {
+function toward(from: P, to: P, dist: number): P {
+  const dx = to[0] - from[0];
+  const dy = to[1] - from[1];
+  const len = Math.hypot(dx, dy) || 1;
+  return [from[0] + (dx / len) * dist, from[1] + (dy / len) * dist];
+}
+
+function Node({ def, index, run, p, side, selected, onSelect }: { def: StageDef; index: number; run?: StageRun; p: P; side: Side; selected: boolean; onSelect: (k: string) => void }) {
   const status = run?.status ?? "pending";
+  const t = TONE[status];
+  const gate = def.v_side === "gate";
+  const [x, y] = p;
+  const sub = status === "passed" || status === "failed" ? `${STATUS_LABEL[status]}${run?.started_at ? ` · ${fmtDuration(run.started_at, run.ended_at)}` : ""}` : STATUS_LABEL[status];
+  const pad = R + (gate ? 16 : 10);
+  const lx = side === "left" ? x - pad : side === "right" ? x + pad : x;
+  const anchor = side === "left" ? "end" : side === "right" ? "start" : "middle";
+  const ly = side === "above" ? y - R - 22 : side === "below" ? y + R + 18 : y - 2;
+  const pending = status === "pending";
+
   return (
-    <button type="button" onClick={() => onSelect(def.key)} className="group absolute flex flex-col items-center" style={{ left: x - 60, top: y - 18, width: 120 }}>
-      <span
-        className={cn(
-          "h-9 w-9 rotate-45 rounded-[4px] border-2 bg-surface transition-shadow group-hover:shadow-md",
-          GATE_TONE[status] ?? "border-dashed border-muted/60",
-          selected && "outline outline-2 outline-offset-2 outline-accent",
-        )}
-      />
-      <span className="mt-2.5 text-[12px] font-semibold">{def.name}</span>
-      <span className={cn("text-[11px]", status === "awaiting_approval" ? "text-warn" : status === "passed" ? "text-ok" : "text-muted")}>{STATUS_LABEL[status]}</span>
-    </button>
+    <g
+      role="button"
+      tabIndex={0}
+      aria-label={`${def.name}: ${STATUS_LABEL[status]}`}
+      onClick={() => onSelect(def.key)}
+      onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && onSelect(def.key)}
+      className="group cursor-pointer outline-none"
+    >
+      <circle cx={x} cy={y} r={R + 14} fill="transparent" />
+      {status === "awaiting_approval" && <circle cx={x} cy={y} r={R + 10} fill="hsl(var(--warn) / 0.14)" className="svg-pulse" />}
+      {status === "running" && <circle cx={x} cy={y} r={R + 6} fill="none" stroke="hsl(var(--run))" strokeWidth={1.25} strokeDasharray="3 4" className="svg-spin" />}
+      {selected && <circle cx={x} cy={y} r={R + 9} fill="none" stroke="hsl(var(--fg))" strokeWidth={1.25} />}
+      <circle cx={x} cy={y} r={R + 9} fill="none" stroke="hsl(var(--fg) / 0.35)" strokeWidth={1} className="opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100" />
+      {gate ? (
+        <rect x={x - 13} y={y - 13} width={26} height={26} rx={2} transform={`rotate(45 ${x} ${y})`} fill={t.fill} stroke={t.stroke} strokeWidth={1.5} />
+      ) : (
+        <circle cx={x} cy={y} r={R} fill={t.fill} stroke={t.stroke} strokeWidth={1.5} />
+      )}
+      {status === "passed" && !gate ? (
+        <path d={`M ${x - 5} ${y} l 3.5 3.5 l 6.5 -7`} fill="none" stroke={t.text} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+      ) : (
+        <text x={x} y={y + 3.5} fontSize={10.5} textAnchor="middle" fill={t.text} className="tnum font-mono" fontWeight={500}>
+          {String(index + 1).padStart(2, "0")}
+        </text>
+      )}
+      <text x={lx} y={ly} textAnchor={anchor} fontSize={14} fontWeight={600} fill={pending ? "hsl(var(--muted))" : "hsl(var(--fg))"} letterSpacing={-0.2}>
+        {def.name}
+      </text>
+      <text x={lx} y={ly + 15} textAnchor={anchor} fontSize={10.5} fill={t.text} className="font-mono uppercase" letterSpacing={0.8}>
+        {sub}
+      </text>
+    </g>
   );
 }

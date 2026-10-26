@@ -2,50 +2,97 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Field-to-Fix design tokens.
+   Two themes: "graphite" (dark, default) for the operations floor and "paper" (light) for reviews.
+   One signal colour (safety orange) marks live work and primary actions; status colours are reserved for state. */
 :root {
-  --bg: 210 20% 98%;
-  --surface: 0 0% 100%;
-  --subtle: 210 20% 96%;
-  --border: 214 20% 89%;
-  --fg: 222 47% 11%;
-  --muted: 215 16% 44%;
-  --accent: 221 83% 53%;
+  --bg: 40 12% 95%;
+  --surface: 40 20% 98.5%;
+  --raised: 0 0% 100%;
+  --subtle: 40 8% 91%;
+  --border: 36 8% 85%;
+  --strong: 36 6% 72%;
+  --fg: 220 14% 9%;
+  --muted: 220 6% 40%;
+  --faint: 220 5% 60%;
+  --accent: 16 85% 50%;
   --accent-fg: 0 0% 100%;
-  --ok: 160 84% 32%;
-  --run: 221 83% 53%;
-  --warn: 32 95% 44%;
-  --bad: 0 72% 51%;
+  --run: 16 85% 50%;
+  --ok: 162 72% 30%;
+  --warn: 36 92% 40%;
+  --bad: 356 72% 47%;
+  --info: 200 80% 38%;
+  --grid: 36 8% 86%;
   color-scheme: light;
 }
 .dark {
-  --bg: 222 22% 7%;
-  --surface: 222 20% 10%;
-  --subtle: 220 17% 14%;
-  --border: 217 15% 20%;
-  --fg: 210 20% 94%;
-  --muted: 215 14% 62%;
-  --accent: 217 91% 60%;
-  --accent-fg: 0 0% 100%;
-  --ok: 158 64% 45%;
-  --run: 217 91% 62%;
-  --warn: 38 92% 55%;
-  --bad: 0 84% 63%;
+  --bg: 220 16% 5%;
+  --surface: 220 14% 7.5%;
+  --raised: 220 13% 10%;
+  --subtle: 220 12% 12.5%;
+  --border: 220 10% 16%;
+  --strong: 220 8% 26%;
+  --fg: 216 14% 92%;
+  --muted: 218 8% 58%;
+  --faint: 218 6% 40%;
+  --accent: 18 100% 58%;
+  --accent-fg: 220 16% 6%;
+  --run: 18 100% 58%;
+  --ok: 156 58% 50%;
+  --warn: 41 92% 60%;
+  --bad: 357 86% 64%;
+  --info: 195 80% 60%;
+  --grid: 220 10% 11%;
   color-scheme: dark;
 }
 
 html, body, #root { height: 100%; }
 body {
   @apply bg-bg text-fg font-sans text-sm antialiased;
-  font-feature-settings: "cv11", "ss01";
+  font-feature-settings: "ss01", "cv11";
 }
 .tnum { font-variant-numeric: tabular-nums; }
-::selection { background: hsl(var(--accent) / 0.2); }
-* { scrollbar-width: thin; scrollbar-color: hsl(var(--border)) transparent; }
+::selection { background: hsl(var(--accent) / 0.25); }
+* { scrollbar-width: thin; scrollbar-color: hsl(var(--strong)) transparent; }
 
-/* React Flow theming */
-.react-flow__attribution { display: none; }
-.react-flow { --xy-background-color: transparent; }
-.react-flow__edge-path { stroke: hsl(var(--border)); stroke-width: 1.5; }
-.react-flow__edge.active .react-flow__edge-path { stroke: hsl(var(--run)); }
-.react-flow__edge.done .react-flow__edge-path { stroke: hsl(var(--ok) / 0.6); }
-.react-flow__handle { opacity: 0; }
+@layer components {
+  /* Micro-label: the console's primary way of naming things. */
+  .label { @apply font-mono text-2xs uppercase tracking-[0.09em] text-muted; }
+  .panel { @apply rounded-md border border-border bg-surface; }
+  .hairline { @apply border-border; }
+}
+
+/* Blueprint grid used behind schematic views. */
+.blueprint {
+  background-image:
+    linear-gradient(hsl(var(--grid)) 1px, transparent 1px),
+    linear-gradient(90deg, hsl(var(--grid)) 1px, transparent 1px);
+  background-size: 24px 24px;
+  background-position: -1px -1px;
+}
+/* Hazard stripe for gates that need a human. */
+.hazard {
+  background-image: repeating-linear-gradient(-45deg, hsl(var(--warn)) 0 6px, transparent 6px 12px);
+}
+.hatch {
+  background-image: repeating-linear-gradient(-45deg, currentColor 0 1px, transparent 1px 5px);
+}
+/* Corner ticks frame the hero schematic like a drawing sheet. */
+.ticks { position: relative; }
+.ticks::before, .ticks::after {
+  content: ""; position: absolute; width: 10px; height: 10px; pointer-events: none;
+  border-color: hsl(var(--strong));
+}
+.ticks::before { top: -1px; left: -1px; border-top: 1px solid; border-left: 1px solid; }
+.ticks::after { bottom: -1px; right: -1px; border-bottom: 1px solid; border-right: 1px solid; }
+
+.svg-spin { transform-box: fill-box; transform-origin: center; animation: spin 3s linear infinite; }
+.svg-flow { animation: flow 0.9s linear infinite; }
+.svg-pulse { animation: pulseRing 1.6s ease-in-out infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes flow { to { stroke-dashoffset: -24; } }
+@keyframes pulseRing { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .svg-spin, .svg-flow, .svg-pulse, .animate-pulseSoft, .animate-sweep, .animate-spinSlow { animation: none !important; }
+}

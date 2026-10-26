@@ -14,30 +14,40 @@ import {
 } from "recharts";
 import type { ChartContent } from "@/lib/api";
 
-export const SERIES_COLORS = ["#2563eb", "#14b8a6", "#f59e0b", "#8b5cf6", "#ef4444", "#64748b"];
+// Ordered for adjacent contrast on both themes; accent first so a single series reads as "the signal".
+export const SERIES_COLORS = ["hsl(var(--accent))", "#4cc9f0", "#9d8cff", "hsl(var(--ok))", "#f7c948", "#a3abb8"];
 
 export const axis = {
   stroke: "hsl(var(--border))",
-  tick: { fill: "hsl(var(--muted))", fontSize: 11 },
+  tick: { fill: "hsl(var(--faint))", fontSize: 10, fontFamily: "Geist Mono, ui-monospace, monospace" },
   tickLine: false,
 } as const;
 
-export const grid = <CartesianGrid stroke="hsl(var(--border))" strokeDasharray="0" vertical={false} />;
+export const grid = <CartesianGrid stroke="hsl(var(--border))" strokeDasharray="2 4" vertical={false} />;
 
 export const tooltipProps = {
   contentStyle: {
-    background: "hsl(var(--surface))",
-    border: "1px solid hsl(var(--border))",
-    borderRadius: 6,
-    fontSize: 12,
+    background: "hsl(var(--raised))",
+    border: "1px solid hsl(var(--strong))",
+    borderRadius: 3,
+    fontSize: 11,
+    fontFamily: "Geist Mono, ui-monospace, monospace",
     color: "hsl(var(--fg))",
-    boxShadow: "0 4px 12px rgb(0 0 0 / 0.08)",
+    boxShadow: "0 10px 30px rgb(0 0 0 / 0.25)",
+    padding: "6px 10px",
   },
-  labelStyle: { color: "hsl(var(--muted))", marginBottom: 4 },
-  cursor: { fill: "hsl(var(--subtle))", stroke: "hsl(var(--border))" },
+  labelStyle: { color: "hsl(var(--muted))", marginBottom: 4, textTransform: "uppercase" as const, letterSpacing: "0.06em" },
+  itemStyle: { padding: 0 },
+  cursor: { fill: "hsl(var(--fg) / 0.04)", stroke: "hsl(var(--strong))" },
 } as const;
 
-const legend = <Legend iconType="circle" iconSize={7} wrapperStyle={{ fontSize: 11, color: "hsl(var(--muted))" }} />;
+const legend = (
+  <Legend
+    iconType="square"
+    iconSize={7}
+    wrapperStyle={{ fontSize: 10, color: "hsl(var(--muted))", fontFamily: "Geist Mono, ui-monospace, monospace", textTransform: "uppercase", letterSpacing: "0.06em", paddingTop: 6 }}
+  />
+);
 
 /** Renders the generic chart artifact contract: {type, x, series, data}. */
 export function ChartArtifact({ chart, height = 220 }: { chart: ChartContent; height?: number }) {
@@ -63,7 +73,7 @@ export function ChartArtifact({ chart, height = 220 }: { chart: ChartContent; he
           <Tooltip {...tooltipProps} />
           {series.length > 1 && legend}
           {series.map((s, i) => (
-            <Bar key={s.key} dataKey={s.key} name={s.label} fill={SERIES_COLORS[i % SERIES_COLORS.length]} radius={[2, 2, 0, 0]} maxBarSize={28} isAnimationActive={false} />
+            <Bar key={s.key} dataKey={s.key} name={s.label} fill={SERIES_COLORS[i % SERIES_COLORS.length]} radius={[1, 1, 0, 0]} maxBarSize={22} isAnimationActive={false} />
           ))}
         </BarChart>
       )}

@@ -1,36 +1,39 @@
 import { useCallback, useEffect, useMemo } from "react";
-import { useParams, useSearchParams } from "react-router-dom";
-import { ArrowRight, GitBranch, Workflow } from "lucide-react";
+import { Link, useParams, useSearchParams } from "react-router-dom";
+import { ArrowRight } from "lucide-react";
 import { api, type Case, type CaseDetail, type F2FEvent, type LogLine, type StageRun } from "@/lib/api";
 import { useAsync, useEventStream } from "@/lib/hooks";
 import { useApp } from "@/lib/context";
 import { PageBody } from "@/components/layout/Page";
-import { Card } from "@/components/ui/card";
-import { Segmented, Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardHeader } from "@/components/ui/card";
+import { Segmented, TabCount, Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ErrorState, Skeleton, Empty } from "@/components/ui/states";
 import { Table, Td, Th, Tr } from "@/components/ui/table";
 import { CaseStatusChip, LinkChip, SeverityBadge, SourceBadge } from "@/components/domain";
-import { fmtTime, timeAgo } from "@/lib/utils";
-import { PipelineGraph } from "./PipelineGraph";
+import { cn, fmtClock, fmtTime, timeAgo } from "@/lib/utils";
+import { StageTape } from "./StageTape";
 import { VModelView } from "./VModelView";
-import { StagePanel } from "./StagePanel";
+import { TimelineView } from "./TimelineView";
+import { StageInspector } from "./StagePanel";
 import { ApprovalBanner } from "./ApprovalBanner";
 import { FleetPanel } from "./FleetPanel";
+
+type View = "v" | "timeline";
 
 export default function CaseDetailPage() {
   const { id = "" } = useParams();
   const { stages } = useApp();
   const detail = useAsync(() => api.caseDetail(id), [id]);
   const [params, setParams] = useSearchParams();
-  const view: "pipeline" | "v" = params.get("view") === "v" ? "v" : "pipeline";
-  const setView = (v: "pipeline" | "v") =>
+  const view: View = params.get("view") === "timeline" ? "timeline" : "v";
+  const setView = (v: View) =>
     setParams((p) => {
-      if (v === "v") p.set("view", "v");
+      if (v === "timeline") p.set("view", "timeline");
       else p.delete("view");
       return p;
     }, { replace: true });
   // Selected stage lives in the URL (?stage=fix) so a stage can be deep-linked from Jira or a PR.
-  const selected = params.get("stage");
+  const selectedParam = params.get("stage");
   const setSelected = useCallback(
     (k: string | null) =>
       setParams((p) => {
@@ -62,61 +65,88 @@ export default function CaseDetailPage() {
 
   const runs = useMemo(() => Object.fromEntries((detail.data?.stages ?? []).map((r) => [r.stage, r])), [detail.data]);
   const awaiting = detail.data?.stages.find((r) => r.status === "awaiting_approval");
+
+  // Without an explicit selection the inspector follows the live stage, else the last one that ran.
+  const focus = useMemo(() => {
+    const live = stages.find((s) => ["running", "awaiting_approval", "failed"].includes(runs[s.key]?.status ?? ""));
+    const last = [...stages].reverse().find((s) => runs[s.key] && runs[s.key].status !== "pending");
+    return (live ?? last ?? stages[0])?.key ?? null;
+  }, [stages, runs]);
+  const selected = selectedParam ?? focus;
   const selIndex = stages.findIndex((s) => s.key === selected);
 
   if (detail.error && !detail.data) return <PageBody><ErrorState error={detail.error} onRetry={reload} /></PageBody>;
-  if (!detail.data) return <PageBody><Skeleton className="h-24" /><Skeleton className="mt-6 h-[360px]" /></PageBody>;
+  if (!detail.data) return <PageBody><Skeleton className="h-28" /><Skeleton className="mt-6 h-16" /><Skeleton className="mt-6 h-[460px]" /></PageBody>;
 
   const c = detail.data.case;
   return (
     <PageBody>
       <CaseHeader c={c} live={live} />
+
+      <div className="mt-6">
+        {stages.length ? <StageTape stages={stages} runs={runs} selected={selected} onSelect={setSelected} /> : <Skeleton className="h-[74px]" />}
+      </div>
+
       {awaiting && (
-        <div className="mt-6">
+        <div className="mt-5">
           <ApprovalBanner caseId={c.id} run={awaiting} onDone={reload} />
         </div>
       )}
-      <Tabs defaultValue="pipeline" className="mt-6">
-        <TabsList>
-          <TabsTrigger value="pipeline">Pipeline</TabsTrigger>
-          <TabsTrigger value="fleet">Fleet & OTA</TabsTrigger>
-          <TabsTrigger value="signals">
-            Signals <span className="tnum ml-1 text-muted">{detail.data.signals.length}</span>
-          </TabsTrigger>
-        </TabsList>
-        <TabsContent value="pipeline" className="pt-4">
-          <Card>
-            <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
-              <div className="text-xs text-muted">Select a stage to inspect agent reasoning, artifacts and linked tools.</div>
+
+      <div className="mt-5 grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_440px]">
+        <Card className="ticks overflow-hidden">
+          <CardHeader
+            title={view === "v" ? "V-model" : "Timeline"}
+            description={view === "v" ? "Field → diagnose down the right side → fix on the left → verify back up to the vehicle" : "Time spent per stage; the human gate is shown hatched"}
+            action={
               <Segmented
                 value={view}
                 onChange={setView}
                 options={[
-                  { value: "pipeline", label: "Pipeline", icon: <Workflow size={12} /> },
-                  { value: "v", label: "V-model", icon: <GitBranch size={12} /> },
+                  { value: "v", label: "V-model" },
+                  { value: "timeline", label: "Timeline" },
                 ]}
               />
-            </div>
-            <div className="p-2">
-              {!stages.length ? (
-                <Skeleton className="h-[330px]" />
-              ) : view === "pipeline" ? (
-                <PipelineGraph stages={stages} runs={runs} selected={selected} onSelect={setSelected} />
-              ) : (
-                <VModelView stages={stages} runs={runs} selected={selected} onSelect={setSelected} />
-              )}
-            </div>
-          </Card>
+            }
+          />
+          <div className={cn(view === "v" && "blueprint px-3 py-4")}>
+            {!stages.length ? (
+              <Skeleton className="m-4 h-[420px]" />
+            ) : view === "v" ? (
+              <VModelView stages={stages} runs={runs} selected={selected} onSelect={setSelected} />
+            ) : (
+              <TimelineView stages={stages} runs={runs} selected={selected} onSelect={setSelected} />
+            )}
+          </div>
+        </Card>
+        <StageInspector
+          def={stages[selIndex]}
+          run={selected ? runs[selected] : undefined}
+          index={selIndex}
+          total={stages.length}
+          onStep={(d) => {
+            const next = stages[selIndex + d];
+            if (next) setSelected(next.key);
+          }}
+        />
+      </div>
+
+      <Tabs defaultValue="activity" className="mt-8">
+        <TabsList>
+          <TabsTrigger value="activity">Activity</TabsTrigger>
+          <TabsTrigger value="fleet">Fleet &amp; OTA</TabsTrigger>
+          <TabsTrigger value="signals">Signals <TabCount n={detail.data.signals.length} /></TabsTrigger>
+        </TabsList>
+        <TabsContent value="activity" className="pt-5">
           <ActivityFeed runs={detail.data.stages} onSelect={setSelected} />
         </TabsContent>
-        <TabsContent value="fleet" className="pt-4">
+        <TabsContent value="fleet" className="pt-5">
           <FleetPanel caseId={c.id} refreshKey={c.updated_at} />
         </TabsContent>
-        <TabsContent value="signals" className="pt-4">
+        <TabsContent value="signals" className="pt-5">
           <CaseSignals detail={detail.data} />
         </TabsContent>
       </Tabs>
-      <StagePanel def={stages[selIndex]} run={selected ? runs[selected] : undefined} index={selIndex} onClose={() => setSelected(null)} />
     </PageBody>
   );
 }
@@ -145,73 +175,96 @@ function applyEvent(prev: CaseDetail, e: F2FEvent): CaseDetail {
 }
 
 function CaseHeader({ c, live }: { c: Case; live: boolean }) {
-  const meta: [string, React.ReactNode][] = [
-    ["Severity", <SeverityBadge severity={c.severity} />],
-    ["Component", c.component ?? "—"],
+  const fixedPct = c.affected_vins ? Math.round((c.fixed_vins / c.affected_vins) * 100) : 0;
+  const spec: [string, React.ReactNode][] = [
+    ["Component", <span className="font-mono text-[12.5px]">{c.component ?? "—"}</span>],
     [
       "Software",
-      <span className="inline-flex items-center gap-1.5 font-mono text-xs">
-        {c.sw_version ?? "—"}
+      <span className="inline-flex items-center gap-1.5 font-mono text-[12.5px]">
+        <span className={c.fixed_version ? "text-muted line-through decoration-faint" : ""}>{c.sw_version ?? "—"}</span>
         {c.fixed_version && (
           <>
-            <ArrowRight size={12} className="text-muted" />
+            <ArrowRight size={12} className="text-faint" />
             <span className="text-ok">{c.fixed_version}</span>
           </>
         )}
       </span>,
     ],
-    ["Vehicle", c.vehicle_model ?? "—"],
-    ["Affected / fixed", <span className="tnum">{c.affected_vins} / {c.fixed_vins}</span>],
-    ["Opened", fmtTime(c.created_at)],
+    ["Vehicle", <span className="text-[12.5px]">{c.vehicle_model ?? "—"}</span>],
+    [
+      "Fleet impact",
+      <span className="block">
+        <span className="tnum font-mono text-[12.5px]">
+          {c.affected_vins} <span className="text-faint">affected ·</span> <span className={c.fixed_vins ? "text-ok" : ""}>{c.fixed_vins}</span> <span className="text-faint">fixed</span>
+        </span>
+        <span className="mt-1.5 block h-[3px] w-full max-w-[180px] overflow-hidden rounded-full bg-subtle">
+          <span className="block h-full bg-ok" style={{ width: `${fixedPct}%` }} />
+        </span>
+      </span>,
+    ],
+    ["Opened", <span className="tnum font-mono text-[12.5px]">{fmtTime(c.created_at)}</span>],
+    ["Updated", <span className="tnum font-mono text-[12.5px]">{timeAgo(c.updated_at)}</span>],
   ];
   return (
     <div>
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="font-mono text-xs text-muted">{c.id}</span>
-        <CaseStatusChip status={c.status} />
-        <span className="ml-auto inline-flex items-center gap-1.5 text-xs text-muted">
-          <span className={live ? "h-1.5 w-1.5 animate-pulseSoft rounded-full bg-ok" : "h-1.5 w-1.5 rounded-full bg-warn"} />
-          {live ? "Live" : "Polling"}
+      <div className="label flex items-center gap-2">
+        <Link to="/cases" className="hover:text-fg">Cases</Link>
+        <span className="text-faint">/</span>
+        <span className="text-fg">{c.id}</span>
+        <span className="ml-auto inline-flex items-center gap-1.5">
+          <span className={cn("h-1.5 w-1.5 rounded-full", live ? "animate-pulseSoft bg-ok" : "bg-warn")} />
+          {live ? "Live stream" : "Polling"}
         </span>
       </div>
-      <h1 className="mt-1.5 text-lg font-semibold tracking-tight">{c.title}</h1>
-      <dl className="mt-3 flex flex-wrap gap-x-8 gap-y-2 text-sm">
-        {meta.map(([k, v]) => (
-          <div key={k}>
-            <dt className="text-xs text-muted">{k}</dt>
-            <dd className="mt-0.5">{v}</dd>
+      <div className="mt-3 flex flex-wrap items-end justify-between gap-x-10 gap-y-4">
+        <div className="min-w-0 max-w-4xl">
+          <div className="flex items-center gap-3">
+            <CaseStatusChip status={c.status} />
+            <SeverityBadge severity={c.severity} />
+          </div>
+          <h1 className="mt-2.5 text-[30px] font-semibold leading-[36px] tracking-[-0.03em]">{c.title}</h1>
+        </div>
+        {c.links.length > 0 && (
+          <div className="flex max-w-[640px] flex-wrap justify-end gap-1.5">
+            {c.links.map((l, i) => <LinkChip key={i} link={l} />)}
+          </div>
+        )}
+      </div>
+      <dl className="mt-5 grid grid-cols-2 border-y border-border md:grid-cols-3 xl:grid-cols-6">
+        {spec.map(([k, v], i) => (
+          <div key={k} className={cn("px-4 py-3", i > 0 && "xl:border-l xl:border-border", "first:pl-0")}>
+            <dt className="label">{k}</dt>
+            <dd className="mt-1">{v}</dd>
           </div>
         ))}
       </dl>
-      {c.links.length > 0 && (
-        <div className="mt-3 flex flex-wrap gap-1.5">
-          {c.links.map((l, i) => <LinkChip key={i} link={l} />)}
-        </div>
-      )}
     </div>
   );
 }
 
+const LEVEL_CLS: Record<string, string> = { error: "text-bad", warn: "text-warn", tool: "text-[#9d8cff]", info: "text-faint" };
+
 function ActivityFeed({ runs, onSelect }: { runs: StageRun[]; onSelect: (k: string) => void }) {
   const { stages } = useApp();
+  const idx = (k: string) => stages.findIndex((s) => s.key === k);
   const name = (k: string) => stages.find((s) => s.key === k)?.name ?? k;
   const lines = runs
     .flatMap((r) => r.logs.filter((l) => l.level !== "thought").map((l) => ({ ...l, stage: r.stage })))
     .sort((a, b) => b.ts - a.ts)
-    .slice(0, 14);
+    .slice(0, 18);
   return (
-    <Card className="mt-6">
-      <div className="border-b border-border px-4 py-3">
-        <h3 className="text-sm font-semibold">Activity</h3>
-        <p className="mt-0.5 text-xs text-muted">Most recent agent and tool actions across stages</p>
-      </div>
+    <Card>
+      <CardHeader title="Activity" description="Most recent agent and tool actions across stages" />
       {lines.length ? (
-        <ul className="divide-y divide-border">
+        <ul className="py-1.5 font-mono text-[12px] leading-5">
           {lines.map((l, i) => (
-            <li key={i} className="flex items-center gap-3 px-4 py-2 text-sm">
-              <span className="tnum w-16 shrink-0 text-xs text-muted">{timeAgo(l.ts)}</span>
-              <button onClick={() => onSelect(l.stage)} className="w-32 shrink-0 truncate text-left text-xs font-medium text-accent hover:underline">{name(l.stage)}</button>
-              <span className={`min-w-0 flex-1 truncate ${l.level === "error" ? "text-bad" : l.level === "warn" ? "text-warn" : ""}`}>{l.msg}</span>
+            <li key={i} className="grid grid-cols-[72px_180px_48px_1fr] items-baseline gap-3 px-4 py-1 hover:bg-subtle/50">
+              <span className="tnum text-faint">{fmtClock(l.ts)}</span>
+              <button onClick={() => onSelect(l.stage)} className="truncate text-left text-muted hover:text-accent">
+                <span className="text-faint">{String(idx(l.stage) + 1).padStart(2, "0")}</span> {name(l.stage)}
+              </button>
+              <span className={cn("uppercase", LEVEL_CLS[l.level] ?? "text-faint")}>{l.level}</span>
+              <span className={cn("min-w-0 truncate", l.level === "error" ? "text-bad" : l.level === "warn" ? "text-warn" : "text-fg")}>{l.msg}</span>
             </li>
           ))}
         </ul>
@@ -240,17 +293,17 @@ function CaseSignals({ detail }: { detail: CaseDetail }) {
           {detail.signals.map((s) => (
             <Tr key={s.id}>
               <Td><SourceBadge source={s.source} /></Td>
-              <Td className="max-w-[460px]">
+              <Td className="max-w-[520px]">
                 {s.url ? (
-                  <a href={s.url} target="_blank" rel="noreferrer" className="block truncate font-medium hover:underline">{s.title}</a>
+                  <a href={s.url} target="_blank" rel="noreferrer" className="block truncate text-[13px] font-medium hover:text-accent">{s.title}</a>
                 ) : (
-                  <span className="block truncate font-medium">{s.title}</span>
+                  <span className="block truncate text-[13px] font-medium">{s.title}</span>
                 )}
                 {s.body && <span className="block truncate text-xs text-muted">{s.body}</span>}
               </Td>
-              <Td className="font-mono text-xs">{s.vin ?? s.author ?? "—"}</Td>
-              <Td className="font-mono text-xs">{s.sw_version ?? "—"}</Td>
-              <Td className="whitespace-nowrap text-right text-xs text-muted">{timeAgo(s.created_at)}</Td>
+              <Td className="font-mono text-[12px] text-muted">{s.vin ?? s.author ?? "—"}</Td>
+              <Td className="font-mono text-[12px]">{s.sw_version ?? "—"}</Td>
+              <Td className="tnum whitespace-nowrap text-right font-mono text-2xs text-faint">{timeAgo(s.created_at)}</Td>
             </Tr>
           ))}
         </tbody>
