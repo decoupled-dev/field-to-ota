@@ -1,0 +1,25 @@
+{
+  "id": "FEAT-003",
+  "type": "feat",
+  "description": "Frontend component for the Field Discovery stage. Renders source coverage and top issues in the dense, Linear/Datadog/GitHub Actions tone required by ui.md. Independent of FEAT-002 — can be implemented in parallel once FEAT-001 is done, since it only reads StageRun outputs and artifacts that are already typed in frontend/src/lib/api.ts.",
+  "status": "completed",
+  "steps": [
+    "Create directory frontend/src/components/stages/ (create it by placing the component file there).",
+    "Create frontend/src/components/stages/FieldDiscovery.tsx. The component signature is: export function FieldDiscoveryStageView({ run }: { run: StageRun }). It reads: (a) outputs from run.outputs: total_issues (number), actionable (number), sources_live (number), sources_simulated (number), engine (string); (b) artifacts: parse run.artifacts to find the artifact named 'Discovered issues' (kind='json') and 'Source coverage' (kind='json'), use their content field directly (already an object/array from the backend). Layout (no gradients, no emoji, no glassmorphism): (1) Top metrics strip — 3-cell grid matching StagePanel's Stat pattern, bg-surface, 1px border border-border, 6px radius overflow-hidden. Cells: 'Total Issues' tnum font-medium, 'Actionable' with count + Badge tone='ok' if >0 else tone='neutral', 'Sources' with live/simulated breakdown as 'Nlive / Msim' in tnum. (2) Source coverage section — heading 'Sources searched' in text-xs uppercase tracking-wider text-muted mb-2. Table: rounded border border-border overflow-hidden, divide-y divide-border. Columns: Source (font-medium text-sm), Category (text-xs text-muted), Status (Badge: tone='run' + label 'Live' if not simulated, tone='warn' + label 'Simulated' if simulated), Issues (tnum text-sm text-right). If source_coverage artifact not available, skip section. (3) Top issues section — heading 'Top issues by frequency'. Table with columns: # (tnum w-6 text-muted), Title (flex-1 truncate text-sm), Source (text-xs text-muted), Severity (SeverityBadge from ../../domain), Raw count (tnum text-sm text-right), Actionable (Badge tone='ok' text 'MVP' if is_actionable_in_mvp else Badge tone='neutral' text 'noise'). Show top 5 issues sorted by frequency_score descending. If no issues, show Empty component from ../ui/states with title='No issues discovered yet'. (4) If run.simulated is true, show a callout bar at the top: amber left border, bg-warn/5, text-xs, text-warn, saying 'Connector is running in simulated mode — results are loaded from seed data, not live sources.' Use inline style for the border-left since Tailwind won't generate arbitrary border-color classes: style={{ borderLeft: '2px solid var(--color-warn)' }}. All font sizes 13–14px (use text-[13px] or text-sm=14px). Tabular numerals via className='tnum' (existing CSS class in project). Border color via border-border CSS variable. Radius rounded (6px). No gradients. Follow palette: slate neutral, blue-600 accent (text-accent), emerald ok, amber warn, red bad.",
+    "Ensure the component compiles without TypeScript errors. The StageRun type is imported from '@/lib/api'. The Badge component is imported from '../ui/badge'. SeverityBadge and Empty are imported from '../../domain' and '../ui/states' respectively. Parse artifact content with a safe helper: const getArtifact = (name: string) => run.artifacts.find(a => a.name === name)?.content as unknown[]|undefined."
+  ],
+  "acceptance_criteria": [
+    "frontend/src/components/stages/FieldDiscovery.tsx exists and exports FieldDiscoveryStageView",
+    "Component accepts { run: StageRun } props and renders without runtime errors when run.outputs has total_issues/actionable/sources_live/sources_simulated",
+    "Simulated mode shows amber callout bar",
+    "Source coverage table renders Live badge (tone='run') and Simulated badge (tone='warn') correctly",
+    "Top issues table shows SeverityBadge and Actionable chip per row",
+    "cd frontend && npx tsc --noEmit reports no errors in FieldDiscovery.tsx"
+  ],
+  "verification": [
+    "cd frontend && npx tsc --noEmit 2>&1 | grep -i 'FieldDiscovery' | head -5; echo 'TSC done'",
+    "cd frontend && npx tsc --noEmit 2>&1 | grep -c 'error' || echo '0 errors'"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}
