@@ -4,6 +4,7 @@ from __future__ import annotations
 from .. import llm
 from ..config import settings
 from .base import ConnectorInfo
+from .field_discovery import field_discovery_connector
 from .ota import ota_provider
 from .scm import source_control
 from .trackers import issue_tracker
@@ -12,6 +13,7 @@ from .trackers import issue_tracker
 def catalog() -> list[dict]:
     live = settings.mode == "aws"
     entries: list[tuple[ConnectorInfo, list[str]]] = [
+        (field_discovery_connector().info, ["field_discovery"]),
         (ConnectorInfo("reddit", "Reddit", "Reddit", "signal_source", "Subreddit search for owner complaints (r/AndroidAuto, brand subs).",
                        "connected" if settings.reddit_live else "simulated", ["F2F_REDDIT_QUERY"]), ["detect"]),
         (ConnectorInfo("owners_forum", "Owners forum", "DriveTalk", "signal_source", "Brand owners forum crawled via AgentCore Browser.",

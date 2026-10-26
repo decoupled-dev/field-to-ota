@@ -6,6 +6,7 @@
 """
 from __future__ import annotations
 
+import shutil
 from pathlib import Path
 
 import aws_cdk as cdk
@@ -13,6 +14,7 @@ from aws_cdk import (
     Duration,
     RemovalPolicy,
     aws_apprunner as apprunner,
+    aws_bedrock as bedrock,
     aws_cognito as cognito,
     aws_dynamodb as ddb,
     aws_ecr_assets as ecr_assets,
@@ -42,11 +44,23 @@ class FieldToFixStack(cdk.Stack):
     def __init__(self, scope: Construct, cid: str, **kw):
         super().__init__(scope, cid, **kw)
 
+        # Copy seed data into Lambda asset bundle so it is available at /var/task/data/
+        _seed_src = ROOT / "data" / "stellantis_seed_issues.json"
+        _seed_dst = ROOT / "infra" / "lambda_" / "field_discovery" / "data" / "stellantis_seed_issues.json"
+        _seed_dst.parent.mkdir(parents=True, exist_ok=True)
+        if _seed_src.exists():
+            shutil.copy2(_seed_src, _seed_dst)
+
         # Data ------------------------------------------------------------------------------------
         table = ddb.Table(self, "State", partition_key=ddb.Attribute(name="pk", type=ddb.AttributeType.STRING),
                           sort_key=ddb.Attribute(name="sk", type=ddb.AttributeType.STRING),
                           billing_mode=ddb.BillingMode.PAY_PER_REQUEST, stream=ddb.StreamViewType.NEW_IMAGE,
                           removal_policy=RemovalPolicy.DESTROY)
+        field_issues_table = ddb.Table(self, "FieldIssues",
+                                       partition_key=ddb.Attribute(name="pk", type=ddb.AttributeType.STRING),
+                                       sort_key=ddb.Attribute(name="sk", type=ddb.AttributeType.STRING),
+                                       billing_mode=ddb.BillingMode.PAY_PER_REQUEST,
+                                       removal_policy=RemovalPolicy.DESTROY)
         bundles = s3.Bucket(self, "Bundles", encryption=s3.BucketEncryption.S3_MANAGED, enforce_ssl=True,
                             block_public_access=s3.BlockPublicAccess.BLOCK_ALL,
                             lifecycle_rules=[s3.LifecycleRule(expiration=Duration.days(90))],
@@ -74,12 +88,123 @@ class FieldToFixStack(cdk.Stack):
         stage_fn = fn("StageGroup", "backend.app.aws_lambda.stage_group")
         device_fn = fn("DeviceIngest", "backend.app.aws_lambda.device_ingest", 2, 1024)
         crawl_fn = fn("Crawl", "backend.app.aws_lambda.crawl", 5, 1024)
-        bedrock = iam.PolicyStatement(actions=["bedrock:InvokeModel", "bedrock:Converse", "bedrock:Retrieve"], resources=["*"])
+        bedrock_policy = iam.PolicyStatement(actions=["bedrock:InvokeModel", "bedrock:Converse", "bedrock:Retrieve"], resources=["*"])
         for f in (stage_fn, device_fn, crawl_fn):
-            f.add_to_role_policy(bedrock)
+            f.add_to_role_policy(bedrock_policy)
         stage_fn.add_to_role_policy(iam.PolicyStatement(
             actions=["iot:CreateJob", "iot:DescribeThing", "iot:DescribeJob", "athena:StartQueryExecution", "athena:GetQueryResults",
                      "signer:StartSigningJob", "secretsmanager:GetSecretValue"], resources=["*"]))
+
+        # Field Discovery: Lambda action-group handlers + Bedrock Agent -------------------------
+        _fd_env = {
+            "FIELD_ISSUES_TABLE": field_issues_table.table_name,
+            "SEED_DATA_PATH": "/var/task/data/stellantis_seed_issues.json",
+            "AWS_REGION_NAME": self.region,
+        }
+        search_fn = lambda_.Function(self, "FieldDiscoverySearch",
+                                     code=lambda_.Code.from_asset(str(ROOT / "infra" / "lambda_" / "field_discovery")),
+                                     runtime=lambda_.Runtime.PYTHON_3_12,
+                                     handler="handler.lambda_handler",
+                                     timeout=Duration.minutes(5),
+                                     memory_size=512,
+                                     environment=_fd_env)
+        ingest_fn = lambda_.Function(self, "FieldDiscoveryIngest",
+                                     code=lambda_.Code.from_asset(str(ROOT / "infra" / "lambda_" / "field_discovery")),
+                                     runtime=lambda_.Runtime.PYTHON_3_12,
+                                     handler="ingest.lambda_handler",
+                                     timeout=Duration.minutes(5),
+                                     memory_size=512,
+                                     environment=_fd_env)
+        field_issues_table.grant_read_write_data(search_fn)
+        field_issues_table.grant_read_write_data(ingest_fn)
+        _bedrock_policy = iam.PolicyStatement(actions=["bedrock:InvokeModel", "bedrock:Converse"], resources=["*"])
+        search_fn.add_to_role_policy(_bedrock_policy)
+        ingest_fn.add_to_role_policy(_bedrock_policy)
+
+        agent_role = iam.Role(self, "FieldDiscoveryAgentRole",
+                              assumed_by=iam.ServicePrincipal("bedrock.amazonaws.com"))
+        agent_role.add_to_policy(iam.PolicyStatement(actions=["bedrock:InvokeModel"], resources=["*"]))
+        agent_role.add_to_policy(iam.PolicyStatement(
+            actions=["lambda:InvokeFunction"],
+            resources=[search_fn.function_arn, ingest_fn.function_arn]))
+
+        search_fn.add_permission("AllowBedrock",
+                                 principal=iam.ServicePrincipal("bedrock.amazonaws.com"),
+                                 action="lambda:InvokeFunction")
+        ingest_fn.add_permission("AllowBedrock",
+                                 principal=iam.ServicePrincipal("bedrock.amazonaws.com"),
+                                 action="lambda:InvokeFunction")
+
+        field_discovery_agent = bedrock.CfnAgent(self, "FieldDiscoveryAgent",
+            agent_name="field-discovery-agent",
+            foundation_model="anthropic.claude-3-5-sonnet-20241022-v2:0",
+            agent_resource_role_arn=agent_role.role_arn,
+            instruction=(
+                "You are a field intelligence analyst for automotive OEMs. Given an OEM name and vehicle model list, "
+                "systematically search all configured complaint and feedback sources for software-related issues. "
+                "Call search_all_sources to crawl all sources in parallel, then call ingest_issues to store and "
+                "deduplicate the results. Return a structured JSON report containing: total_issues, "
+                "deduplicated_count, actionable_issues (list of issues with is_actionable_in_mvp=true), "
+                "source_coverage (per-source live/simulated status), top_priority_issues (top 5 by "
+                "frequency_score descending)."
+            ),
+            action_groups=[
+                bedrock.CfnAgent.AgentActionGroupProperty(
+                    action_group_name="web-search-action",
+                    action_group_executor=bedrock.CfnAgent.ActionGroupExecutorProperty(
+                        lambda_=search_fn.function_arn),
+                    action_group_state="ENABLED",
+                    function_schema=bedrock.CfnAgent.FunctionSchemaProperty(
+                        functions=[
+                            bedrock.CfnAgent.FunctionProperty(
+                                name="search_all_sources",
+                                description="Search all configured sources for OEM issues",
+                                parameters={
+                                    "oem": bedrock.CfnAgent.ParameterDetailProperty(
+                                        type="string", description="OEM name e.g. Stellantis", required=True),
+                                    "models": bedrock.CfnAgent.ParameterDetailProperty(
+                                        type="string", description="Comma-separated vehicle model names", required=True),
+                                    "since_days": bedrock.CfnAgent.ParameterDetailProperty(
+                                        type="integer", description="Look back window in days", required=False),
+                                }),
+                            bedrock.CfnAgent.FunctionProperty(
+                                name="search_source",
+                                description="Search one specific source",
+                                parameters={
+                                    "source_name": bedrock.CfnAgent.ParameterDetailProperty(
+                                        type="string", description="Source name from DISCOVERY_SOURCES", required=True),
+                                    "query": bedrock.CfnAgent.ParameterDetailProperty(
+                                        type="string", description="Search query string", required=True),
+                                    "since_days": bedrock.CfnAgent.ParameterDetailProperty(
+                                        type="integer", description="Look back window in days", required=False),
+                                }),
+                        ])),
+                bedrock.CfnAgent.AgentActionGroupProperty(
+                    action_group_name="issue-ingest-action",
+                    action_group_executor=bedrock.CfnAgent.ActionGroupExecutorProperty(
+                        lambda_=ingest_fn.function_arn),
+                    action_group_state="ENABLED",
+                    function_schema=bedrock.CfnAgent.FunctionSchemaProperty(
+                        functions=[
+                            bedrock.CfnAgent.FunctionProperty(
+                                name="ingest_issues",
+                                description="Store and deduplicate discovered issues into DynamoDB",
+                                parameters={
+                                    "oem": bedrock.CfnAgent.ParameterDetailProperty(
+                                        type="string", description="OEM name", required=True),
+                                    "issues_json": bedrock.CfnAgent.ParameterDetailProperty(
+                                        type="string", description="JSON array string of issue objects", required=True),
+                                }),
+                        ])),
+            ],
+            auto_prepare=True)
+
+        field_discovery_alias = bedrock.CfnAgentAlias(self, "FieldDiscoveryLive",
+                                                       agent_id=field_discovery_agent.ref,
+                                                       agent_alias_name="live")
+
+        cdk.CfnOutput(self, "FieldDiscoveryAgentId", value=field_discovery_agent.ref)
+        cdk.CfnOutput(self, "FieldDiscoveryAliasArn", value=field_discovery_alias.attr_agent_alias_arn)
 
         # Orchestration: Step Functions ---------------------------------------------------------
         def group(name: str, stages: list[str]) -> tasks.LambdaInvoke:
@@ -138,7 +263,7 @@ class FieldToFixStack(cdk.Stack):
         bundles.grant_read_write(instance_role)
         bus.grant_put_events_to(instance_role)
         machine.grant_task_response(instance_role)
-        instance_role.add_to_policy(bedrock)
+        instance_role.add_to_policy(bedrock_policy)
         access_role = iam.Role(self, "ConsoleAccess", assumed_by=iam.ServicePrincipal("build.apprunner.amazonaws.com"))
         console_image.repository.grant_pull(access_role)
         svc = apprunner.CfnService(self, "Console", service_name="field-to-fix-console",

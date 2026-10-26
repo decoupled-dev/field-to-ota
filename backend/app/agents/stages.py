@@ -35,6 +35,8 @@ from sim.thermal import hal_ready_ms  # noqa: E402
 
 ENGINE = lambda: "Amazon Bedrock · Claude" if llm.available() else "offline analyzer (no Bedrock credentials)"  # noqa: E731
 
+from ..connectors.field_discovery import field_discovery_connector
+
 
 def _signals(ctx: StageContext) -> list[Signal]:
     return [s for s in (store.get_signal(i) for i in ctx.case.signal_ids) if s]
@@ -45,6 +47,50 @@ def _device_temp(signals: list[Signal]) -> float:
         if s.source.value == "device" and "ambient_c" in s.metrics:
             return float(s.metrics["ambient_c"])
     return -8.0
+
+
+# 0. Field Discovery -----------------------------------------------------------------------------
+def field_discovery(ctx: StageContext) -> None:
+    conn = field_discovery_connector()
+    ctx.run.connector = conn.info.name
+    ctx.run.simulated = conn.simulated
+
+    oem = ctx.shared.get("oem", "Stellantis")
+    models = ctx.shared.get("models", ["Dodge", "Jeep", "RAM", "Chrysler", "Uconnect"])
+    since_days = ctx.shared.get("since_days", 90)
+
+    ctx.thought(
+        f"Searching all configured field sources for {oem} ({', '.join(models)}) software issues "
+        f"from the past {since_days} days using {conn.info.name}."
+    )
+
+    result = conn.discover(oem, models, since_days)
+    issues: list[dict] = result.get("issues", [])
+    sources: list[dict] = result.get("sources", [])
+
+    # Log per-source live/simulated status
+    for src in sources:
+        tag = "simulated" if src.get("simulated") else "live"
+        ctx.log(f"[{tag}] {src['name']} ({src.get('category','')}) → {src.get('count', 0)} results")
+
+    actionable = [i for i in issues if i.get("is_actionable_in_mvp")]
+    sources_live = sum(1 for s in sources if not s.get("simulated"))
+    sources_simulated = sum(1 for s in sources if s.get("simulated"))
+
+    ctx.artifact("Discovered issues", "json", content=issues)
+    ctx.artifact("Source coverage", "json", content=sources)
+
+    ctx.shared["discovered_issues"] = issues
+
+    ctx.set(
+        f"Field discovery complete: {len(issues)} issues found across {len(sources)} sources "
+        f"({sources_live} live, {sources_simulated} simulated); {len(actionable)} actionable in MVP.",
+        total_issues=len(issues),
+        actionable=len(actionable),
+        sources_live=sources_live,
+        sources_simulated=sources_simulated,
+        engine=conn.info.vendor,
+    )
 
 
 # 1. Detect ---------------------------------------------------------------------------------------

@@ -13,6 +13,9 @@ class StageDef(BaseModel):
 
 
 STAGES: list[StageDef] = [
+    StageDef(key="field_discovery", name="Field Discovery", v_level="Field operation", v_side="field",
+             agent="Field Discovery Agent (Bedrock)", capability="signal_source",
+             description="Crawls NHTSA, forums, Reddit, app stores and social media to surface actionable Stellantis/Uconnect software issues."),
     StageDef(key="detect", name="Detect", v_level="Field operation", v_side="field", agent="Signal Crawlers / Bundle Analyzer",
              capability="signal_source", description="Field signals from social channels and in-vehicle hu-sentinel daemons."),
     StageDef(key="triage", name="Triage & Cluster", v_level="Field operation", v_side="field", agent="Triage Agent",
