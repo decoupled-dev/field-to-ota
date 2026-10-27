@@ -268,6 +268,36 @@ def rca(ctx: StageContext) -> None:
     ctx.artifact("Log-based root-cause analysis", "json", content=log_finding)
     ctx.shared["log_rca"] = log_finding
 
+    # --- Requirements check: confirm the reported behaviour actually violates a requirement ------
+    from . import requirements_agent
+    ctx.thought("Consulting the requirements agent: is this reported behaviour a violation of a "
+                "requirement (a real defect), or is the system behaving as specified?")
+    observed = (ctx.case.title + ". " + (log_finding.get("root_cause") or "")).strip()
+    conditions = list(getattr(ctx.case, "conditions", None) or ctx.shared.get("conditions") or [])
+    verdict = requirements_agent.assess(
+        wt, ctx.case.component or log_finding.get("suspected_component"),
+        log_ev.symptoms, observed, conditions)
+    ctx.tool(f"requirements_agent.assess(component={ctx.case.component or log_finding.get('suspected_component')}) "
+             f"→ {verdict.verdict} ({verdict.engine}, confidence {verdict.confidence})")
+    if verdict.requirement_id:
+        ctx.log(f"applicable requirement: {verdict.requirement_id}"
+                + (f" (parent {verdict.trace.get('parent')})" if verdict.trace.get("parent") else ""))
+    if verdict.violated_clause:
+        ctx.log(f"violated clause: “{verdict.violated_clause}”", "warn")
+    ctx.log(f"compliance verdict: {'VIOLATION — confirmed defect' if verdict.is_violation else verdict.verdict.upper()} — {verdict.rationale}")
+    ctx.artifact("Requirement compliance verdict", "json", content={
+        "is_violation": verdict.is_violation, "verdict": verdict.verdict,
+        "requirement_id": verdict.requirement_id, "violated_clause": verdict.violated_clause,
+        "rationale": verdict.rationale, "trace": verdict.trace,
+        "confidence": verdict.confidence, "engine": verdict.engine})
+    ctx.shared["requirement_verdict"] = {
+        "is_violation": verdict.is_violation, "verdict": verdict.verdict,
+        "requirement_id": verdict.requirement_id, "violated_clause": verdict.violated_clause,
+        "trace": verdict.trace}
+    if not verdict.is_violation and verdict.verdict != "ambiguous":
+        ctx.log("requirements agent did not confirm a violation; the Fix phase should treat this as a "
+                "possible enhancement rather than a regression.", "warn")
+
     ctx.tool("git log --oneline v2.2.9..v2.3.1 -- media_service/ docs/requirements/")
     commits = git(wt, "log", "--format=%h %ad %s", "--date=short", "v2.2.9..v2.3.1")
     ctx.log(commits)
@@ -308,15 +338,28 @@ def rca(ctx: StageContext) -> None:
     out.setdefault("log_sources", log_ev.sources)
     out.setdefault("log_symptoms", log_ev.symptoms)
     out.setdefault("log_confidence", log_finding.get("confidence"))
+    # Carry the requirements compliance verdict so downstream stages (and the UI) can see whether
+    # this was confirmed as a requirement violation.
+    out["requirement_violation"] = verdict.is_violation
+    out["requirement_verdict"] = verdict.verdict
+    out["violated_requirement"] = verdict.requirement_id
+    out["violated_clause"] = verdict.violated_clause
+    out["requirement_trace"] = verdict.trace
     if log_finding.get("evidence"):
         out["evidence"] = list(dict.fromkeys(list(out.get("evidence", [])) + log_finding["evidence"]))
+    if verdict.is_violation and verdict.violated_clause:
+        out["evidence"] = list(dict.fromkeys(out.get("evidence", []) +
+                                             [f"Violates {verdict.requirement_id}: “{verdict.violated_clause}”"]))
     for step in out.get("mechanism", []):
         ctx.log(f"→ {step}")
     ctx.shared["rca"] = out
     ctx.shared["regression_sha"] = sha
     ctx.artifact("Root-cause analysis", "json", content=out)
+    confirmed = "confirmed requirement violation" if verdict.is_violation else f"compliance: {verdict.verdict}"
     ctx.set(out["root_cause"], out.get("escape_reason", ""), origin=out.get("origin"), confidence=out.get("confidence"),
-            regression_commit=sha, log_sources=log_ev.sources, log_symptoms=log_ev.symptoms, engine=ENGINE())
+            regression_commit=sha, log_sources=log_ev.sources, log_symptoms=log_ev.symptoms,
+            requirement_violation=verdict.is_violation, violated_requirement=verdict.requirement_id,
+            compliance=confirmed, engine=ENGINE())
 
 
 # 7. Requirement ----------------------------------------------------------------------------------
