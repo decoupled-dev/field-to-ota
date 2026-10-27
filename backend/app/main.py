@@ -179,6 +179,56 @@ def discovery_run(body: DiscoverIn | None = None):
     return run_once(**kw)
 
 
+# External V-cycle Fix + Validation agents (repo-agnostic, e.g. the Kotlin HVAC demo-app) --------
+class ExternalFixIn(BaseModel):
+    repo_url: str
+    branch: str
+    file_path: str                       # source file containing the defect
+    root_cause: str = "Crash: a guard clause protecting a division/conversion was removed."
+    test_filter: str | None = None       # e.g. a single test class to keep the run fast
+    test_command: str | None = None      # override auto-detection
+
+
+@app.post("/api/external/fix-and-validate")
+def external_fix_and_validate(body: ExternalFixIn):
+    """Clone a target repo/branch, prove the defect with its real tests (expected to FAIL),
+    apply the Fix agent's patch, and re-run the tests with the Validation agent (expected to PASS).
+    Repo-agnostic: detects Gradle/pytest/maven/npm/cargo."""
+    from .agents import external_repo as er
+    from .agents import external_fix_agent as fix_agent
+    from .agents import external_validation_agent as val_agent
+
+    target = er.RepoTarget(url=body.repo_url, branch=body.branch, test_command=body.test_command)
+    wt = er.clone(target)
+    detected_cmd = target.test_command or er.detect_test_command(wt)
+
+    # 1. Validation BEFORE the fix — the test must fail on the defective build.
+    before = er.run_tests(wt, target, body.test_filter)
+
+    # 2. Fix agent applies the patch (and internally re-validates a model patch).
+    fix = fix_agent.apply(wt, body.file_path, body.root_cause, target, body.test_filter)
+
+    # 3. Validation AFTER the fix.
+    after = er.run_tests(wt, target, body.test_filter)
+    detects_defect = not before.ok
+    validated = detects_defect and after.ok and fix.applied
+
+    return {
+        "repo": body.repo_url, "branch": body.branch, "file": body.file_path,
+        "test_command": detected_cmd, "test_filter": body.test_filter,
+        "validation_before": {"ok": before.ok, "summary": before.summary_line},
+        "fix": {"applied": fix.applied, "strategy": fix.strategy, "summary": fix.summary,
+                "diff": fix.diff[:6000]},
+        "validation_after": {"ok": after.ok, "summary": after.summary_line},
+        "detects_defect": detects_defect,
+        "validated": validated,
+        "verdict": ("Validated: test failed on the defective build and passes on the fix."
+                    if validated else
+                    ("Inconclusive: the test did not fail on the defective build." if not detects_defect
+                     else "Fix not validated: tests still failing after the patch.")),
+    }
+
+
 @app.get("/api/discovery/config")
 def discovery_config():
     return {"oem": settings.discovery_oem, "models": settings.discovery_models,
