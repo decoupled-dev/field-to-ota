@@ -36,9 +36,15 @@ class BedrockAgentFieldDiscovery:
             inputText=payload,
         )
         accumulated = ""
+        _MAX_BYTES = 4 * 1024 * 1024  # 4 MB guard — agent responses should never exceed this
         for event in response["completion"]:
             if "chunk" in event:
-                accumulated += event["chunk"].get("bytes", b"").decode("utf-8")
+                chunk = event["chunk"].get("bytes", b"").decode("utf-8")
+                if len(accumulated) + len(chunk) > _MAX_BYTES:
+                    raise RuntimeError(
+                        f"Bedrock Agent response exceeded {_MAX_BYTES} bytes; aborting."
+                    )
+                accumulated += chunk
         return json.loads(accumulated)
 
 
@@ -61,6 +67,11 @@ class LambdaFieldDiscovery:
         fn_arn = os.environ["FIELD_DISCOVERY_LAMBDA_ARN"]
         payload = json.dumps({"oem": oem, "models": models, "since_days": since_days})
         response = self._client.invoke(FunctionName=fn_arn, Payload=payload.encode())
+        if response.get("FunctionError"):
+            body = response["Payload"].read().decode("utf-8")
+            raise RuntimeError(
+                f"Lambda execution error ({response['FunctionError']}): {body}"
+            )
         body = response["Payload"].read()
         return json.loads(body)
 

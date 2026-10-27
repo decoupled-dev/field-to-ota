@@ -44,8 +44,10 @@ def deduplicate_issues(issues: list[dict]) -> tuple[list[dict], list[dict]]:
     if not issues:
         return [], []
 
-    # Work on a copy so callers are not surprised by mutation.
-    remaining = list(issues)
+    # Sort by raw_count descending so the greedy pass always encounters the
+    # highest-count issue first, making survivor selection stable regardless
+    # of the original list order.
+    remaining = sorted(issues, key=lambda i: i.get("raw_count", 0), reverse=True)
     survivors: list[dict] = []
     merged_pairs: list[dict] = []
 
