@@ -21,14 +21,24 @@ log = logging.getLogger("f2f.discovery.sources")
 _UA = {"User-Agent": "field-to-fix-discovery/0.1 (+https://github.com/decoupled-dev/field-to-ota)"}
 _TIMEOUT = httpx.Timeout(15.0)
 
-# NHTSA model-year window to query (public complaints API is per make/model/year).
+# NHTSA model-year window to query (public complaints/recalls API is per make/model/year).
 _NHTSA_YEARS = (2021, 2022, 2023, 2024)
 
-# Bug-ish keywords used to keep crawls focused on software/infotainment issues before the LLM runs.
+# Real, free, keyless NHTSA API. Host is api.nhtsa.gov (NOT api.nhtsa.dot.gov, which does not resolve).
+_NHTSA_HOST = "https://api.nhtsa.gov"
+
+# Components/keywords that indicate an electronic-control / software / comfort-electronics issue.
+# Broadened beyond infotainment to cover ECU, HVAC, electrical and powertrain-software defects.
 _SOFTWARE_HINTS = (
+    # infotainment / connectivity
     "software", "update", "firmware", "ota", "infotainment", "uconnect", "screen", "display",
     "bluetooth", "android auto", "carplay", "navigation", "nav", "freeze", "frozen", "reboot",
-    "crash", "glitch", "lag", "connectivity", "head unit", "headunit", "radio", "app", "bug",
+    "crash", "glitch", "lag", "connectivity", "head unit", "headunit", "radio", "app",
+    # electronic control units / electrical / HVAC / ADAS
+    "ecu", "ecm", "tcm", "bcm", "control module", "control unit", "electrical", "electronic",
+    "hvac", "defroster", "defogger", "climate", "air condition", "ac ", "heater", "blower",
+    "sensor", "camera", "adas", "lane", "cruise", "telematics", "gateway", "can bus", "instrument",
+    "cluster", "gauge", "power train", "powertrain", "transmission:control", "charging",
 )
 
 
@@ -37,45 +47,96 @@ def _looks_software(*texts: str) -> bool:
     return any(h in blob for h in _SOFTWARE_HINTS)
 
 
+def _recent_enough(date_str: str, since_days: int) -> bool:
+    """NHTSA dates look like MM/DD/YYYY. Keep if within the window (or if unparseable)."""
+    from datetime import datetime, timedelta
+    for fmt in ("%m/%d/%Y", "%d/%m/%Y", "%Y-%m-%d"):
+        try:
+            d = datetime.strptime(date_str, fmt)
+            return d >= datetime.now() - timedelta(days=max(since_days, 1))
+        except (ValueError, TypeError):
+            continue
+    return True
+
+
 # --------------------------------------------------------------------------------------------
-# NHTSA public complaints API (real, free, no key)
+# NHTSA public complaints + recalls API (REAL, free, no key — api.nhtsa.gov)
 # --------------------------------------------------------------------------------------------
 def nhtsa(oem: str, models: list[str], since_days: int) -> list[Complaint]:
     out: list[Complaint] = []
     makes = _oem_makes(oem, models)
+    cap = settings.discovery_max_per_source * 4
     try:
-        with httpx.Client(timeout=_TIMEOUT, headers=_UA) as client:
+        with httpx.Client(timeout=_TIMEOUT, headers=_UA, follow_redirects=True) as client:
             for make in makes:
                 for model in _nhtsa_models(models):
                     for year in _NHTSA_YEARS:
-                        url = ("https://api.nhtsa.dot.gov/complaints/complaintsByVehicle"
-                               f"?make={make}&model={model}&modelYear={year}")
-                        try:
-                            r = client.get(url)
-                            if r.status_code != 200:
-                                continue
-                            results = r.json().get("results", [])
-                        except (httpx.HTTPError, json.JSONDecodeError):
-                            continue
-                        for c in results:
-                            summary = (c.get("summary") or "").strip()
-                            comp = (c.get("components") or "")
-                            if not _looks_software(summary, comp):
-                                continue
-                            odi = str(c.get("odiNumber") or "")
-                            out.append(Complaint(
-                                source_kind="nhtsa",
-                                source_name="NHTSA",
-                                title=(comp or "NHTSA complaint") + f" — {make} {model} {year}",
-                                body=summary,
-                                author=f"nhtsa-odi-{odi}" if odi else None,
-                                url=f"https://www.nhtsa.gov/?nhtsaId={odi}" if odi else url,
-                                external_id=f"nhtsa:{odi}" if odi else None,
-                            ))
-                            if len(out) >= settings.discovery_max_per_source * 4:
-                                return out
+                        out.extend(_nhtsa_complaints(client, make, model, year, since_days))
+                        out.extend(_nhtsa_recalls(client, make, model, year))
+                        if len(out) >= cap:
+                            return out[:cap]
     except Exception as e:  # noqa: BLE001
         log.warning("NHTSA crawl failed: %s", e)
+    return out
+
+
+def _nhtsa_complaints(client: httpx.Client, make: str, model: str, year: int, since_days: int) -> list[Complaint]:
+    url = f"{_NHTSA_HOST}/complaints/complaintsByVehicle?make={make}&model={model}&modelYear={year}"
+    try:
+        r = client.get(url)
+        if r.status_code != 200:
+            return []
+        results = r.json().get("results", [])
+    except (httpx.HTTPError, json.JSONDecodeError):
+        return []
+    out: list[Complaint] = []
+    for c in results:
+        summary = (c.get("summary") or "").strip()
+        comp = (c.get("components") or "")
+        if not _looks_software(summary, comp):
+            continue
+        if not _recent_enough(c.get("dateComplaintFiled") or c.get("dateOfIncident") or "", since_days):
+            continue
+        odi = str(c.get("odiNumber") or "")
+        out.append(Complaint(
+            source_kind="nhtsa",
+            source_name="NHTSA complaints",
+            title=f"{comp or 'NHTSA complaint'} — {make.title()} {model.title()} {year}",
+            body=summary,
+            author=f"nhtsa-odi-{odi}" if odi else None,
+            url=f"https://www.nhtsa.gov/vehicle/{year}/{make}/{model}#complaints",
+            external_id=f"nhtsa:{odi}" if odi else None,
+            extra={"manufacturer": c.get("manufacturer"), "component": comp},
+        ))
+    return out
+
+
+def _nhtsa_recalls(client: httpx.Client, make: str, model: str, year: int) -> list[Complaint]:
+    url = f"{_NHTSA_HOST}/recalls/recallsByVehicle?make={make}&model={model}&modelYear={year}"
+    try:
+        r = client.get(url)
+        if r.status_code != 200:
+            return []
+        results = r.json().get("results", [])
+    except (httpx.HTTPError, json.JSONDecodeError):
+        return []
+    out: list[Complaint] = []
+    for c in results:
+        comp = c.get("Component", "")
+        summary = (c.get("Summary") or "").strip()
+        if not _looks_software(comp, summary):
+            continue
+        campaign = c.get("NHTSACampaignNumber", "")
+        out.append(Complaint(
+            source_kind="nhtsa",
+            source_name="NHTSA recalls",
+            title=f"{comp} — {make.title()} {model.title()} {year}",
+            body=summary,
+            author=c.get("Manufacturer") or "NHTSA",
+            url=f"https://www.nhtsa.gov/recalls?nhtsaId={campaign}" if campaign else None,
+            external_id=f"nhtsa-recall:{campaign}" if campaign else None,
+            extra={"component": comp, "campaign": campaign, "ota": c.get("overTheAirUpdate")},
+        ))
     return out
 
 
@@ -256,17 +317,59 @@ def _tavily(oem: str, models: list[str], since_days: int) -> list[Complaint]:
 # --------------------------------------------------------------------------------------------
 # Helpers
 # --------------------------------------------------------------------------------------------
+# Brand -> NHTSA make names. Stellantis is a parent group, so expand it to its marques.
+_OEM_MAKES = {
+    "stellantis": ["jeep", "dodge", "ram", "chrysler"],
+    "ford": ["ford"],
+    "gm": ["chevrolet", "gmc", "cadillac", "buick"],
+    "toyota": ["toyota", "lexus"],
+    "honda": ["honda", "acura"],
+    "volkswagen": ["volkswagen", "audi"],
+    "hyundai": ["hyundai", "kia", "genesis"],
+}
+
+# Default model names per make when the caller passes only a brand. NHTSA queries are per model.
+_DEFAULT_MODELS = {
+    "jeep": ["grand cherokee", "wrangler", "gladiator", "wagoneer", "compass"],
+    "dodge": ["durango", "charger", "challenger"],
+    "ram": ["1500", "2500"],
+    "chrysler": ["pacifica", "300"],
+    "ford": ["f-150", "explorer", "escape", "mustang mach-e"],
+    "chevrolet": ["silverado 1500", "equinox", "bolt ev", "tahoe"],
+    "gmc": ["sierra 1500"],
+    "toyota": ["camry", "rav4", "highlander"],
+    "honda": ["accord", "cr-v", "civic"],
+    "volkswagen": ["jetta", "atlas", "id.4"],
+    "hyundai": ["tucson", "santa fe", "ioniq 5"],
+}
+
+# These are passed to NHTSA (case-insensitive). Spaces must be URL-encoded by the caller via httpx params.
+_CURRENT_MAKES: list[str] = []
+
+
 def _oem_makes(oem: str, models: list[str]) -> list[str]:
-    if oem.lower() == "stellantis":
-        return ["JEEP", "DODGE", "RAM", "CHRYSLER"]
-    return [oem.upper()]
+    makes = _OEM_MAKES.get(oem.lower())
+    if makes:
+        result = list(makes)
+    else:
+        # Unknown parent: treat the OEM string itself as the make.
+        result = [oem.lower()]
+    _CURRENT_MAKES.clear()
+    _CURRENT_MAKES.extend(result)
+    return [m.replace(" ", "%20") for m in result]
 
 
 def _nhtsa_models(models: list[str]) -> list[str]:
-    # NHTSA wants a model name, not a brand. Use known model names, else a broad default set.
-    known = {"grand cherokee", "wrangler", "gladiator", "wagoneer", "durango", "1500", "pacifica", "charger", "challenger"}
-    picked = [m for m in models if m.lower() in known]
-    return [m.upper().replace(" ", "%20") for m in (picked or ["GRAND CHEROKEE", "1500", "PACIFICA", "DURANGO"])]
+    # If the caller gave concrete model names (not just brand words), use them directly.
+    brandish = set().union(*(set(v) for v in _OEM_MAKES.values())) | set(_OEM_MAKES) | {"uconnect"}
+    concrete = [m for m in models if m.lower() not in brandish]
+    if concrete:
+        return [m.replace(" ", "%20") for m in concrete]
+    # Otherwise expand the current makes to their default model names.
+    out: list[str] = []
+    for mk in _CURRENT_MAKES or ["jeep"]:
+        out.extend(_DEFAULT_MODELS.get(mk, []))
+    return [m.replace(" ", "%20") for m in (out or ["grand cherokee", "f-150", "silverado 1500"])]
 
 
 def _adf_to_text(adf) -> str:
