@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowUpRight, Clock, Layers, ListChecks, Package, Search, Tag, Users, X } from "lucide-react";
+import { ArrowUpRight, Clock, Layers, Package, Search, Tag, Users } from "lucide-react";
 import { api, type Cluster, type Signal } from "@/lib/api";
 import { useAsync, useEventStream } from "@/lib/hooks";
 import { PageBody, PageHeader } from "@/components/layout/Page";
@@ -11,8 +11,26 @@ import { Sheet } from "@/components/ui/sheet";
 import { Empty, ErrorState, Skeleton } from "@/components/ui/states";
 import { Table, Td, Th, Tr } from "@/components/ui/table";
 import { IssueKey, SeverityBadge, SOURCE_META, SourceBadge } from "@/components/domain";
-import { AgentFeed, SourceBoard, useIntake } from "./IntakeBoard";
+import { AgentFeed, AgentStatus, SourceTabs, useIntake } from "./IntakeBoard";
 import { cn, fmtTime, humanize, timeAgo } from "@/lib/utils";
+
+type Group = { key: string; latest: Signal; count: number; title: string };
+
+// A device firing the same rule repeatedly is one problem, not a hundred rows.
+function groupSignals(list: Signal[]): Group[] {
+  const by = new Map<string, Group>();
+  for (const s of list) {
+    const title = s.title.replace(/^hu-sentinel · /, "");
+    const key = `${s.source}|${title}|${s.case_id ?? ""}`;
+    const g = by.get(key);
+    if (!g) by.set(key, { key, latest: s, count: 1, title });
+    else {
+      g.count += 1;
+      if (s.created_at > g.latest.created_at) g.latest = s;
+    }
+  }
+  return [...by.values()].sort((a, b) => b.latest.created_at - a.latest.created_at);
+}
 
 export default function SignalsPage() {
   const signals = useAsync(() => api.signals(), [], 15000);
@@ -20,7 +38,8 @@ export default function SignalsPage() {
   const intake = useIntake();
   const [source, setSource] = useState("");
   const [q, setQ] = useState("");
-  const [open, setOpen] = useState<Signal | null>(null);
+  const [open, setOpen] = useState<Group | null>(null);
+  const [feedOpen, setFeedOpen] = useState(false);
   const [arrived, setArrived] = useState<Set<string>>(new Set());
 
   const live = useEventStream("/api/events", (e) => {
@@ -34,81 +53,86 @@ export default function SignalsPage() {
     if (e.type === "demo.reset") signals.reload();
   });
 
-  const rows = useMemo(() => {
+  const groups = useMemo(() => {
     const needle = q.trim().toLowerCase();
-    return (signals.data ?? []).filter(
-      (s) => (!source || s.source === source) && (!needle || `${s.title} ${s.body} ${s.component ?? ""} ${s.vin ?? ""}`.toLowerCase().includes(needle)),
+    return groupSignals(
+      (signals.data ?? []).filter(
+        (s) => (!source || s.source === source) && (!needle || `${s.title} ${s.body} ${s.component ?? ""} ${s.vin ?? ""}`.toLowerCase().includes(needle)),
+      ),
     );
   }, [signals.data, source, q]);
+  const shown = groups.reduce((n, g) => n + g.count, 0);
 
   return (
     <PageBody>
       <PageHeader
         title="Signals"
-        description="Every intake channel the agent watches, what it is checking right now, and every report it has normalized and triaged."
+        description="Reports from every channel, triaged and grouped into clusters that become cases."
+        actions={<AgentStatus intake={intake.data} checkingUntil={intake.checkingUntil} live={live} onClick={() => setFeedOpen(true)} />}
       />
-      <SourceBoard sources={intake.data?.sources} checkingUntil={intake.checkingUntil} selected={source} onSelect={setSource} />
-      <div className="mt-5 grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_400px]">
+      <SourceTabs sources={intake.data?.sources} total={signals.data?.length ?? 0} checkingUntil={intake.checkingUntil} selected={source} onSelect={setSource} />
+      <div className="mt-5 grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
         <Card className="h-fit min-w-0">
           <div className="flex flex-wrap items-center gap-3 border-b border-border px-4 py-3">
-            <h3 className="flex items-center gap-2 text-[15px] font-semibold">
-              <span className="flex h-6 w-6 items-center justify-center rounded bg-accent/10 text-accent"><ListChecks size={14} strokeWidth={2.25} /></span>
-              Reports
-            </h3>
-            {source && (
-              <button onClick={() => setSource("")} className="inline-flex h-6 items-center gap-1.5 rounded-full bg-accent/10 pl-2 pr-1.5 text-xs font-medium text-accent hover:bg-accent/15">
-                <span className="h-1.5 w-1.5 rounded-full" style={{ background: SOURCE_META[source as keyof typeof SOURCE_META]?.color }} />
-                {SOURCE_META[source as keyof typeof SOURCE_META]?.label ?? source}
-                <X size={12} />
-              </button>
-            )}
-            <span className="tnum text-xs text-faint">{rows.length} shown</span>
-            <div className="relative ml-auto w-64">
-              <Search size={13} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-faint" />
-              <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search title, body, component, VIN" className="pl-8" />
+            <h3 className="text-[15px] font-semibold">Reports</h3>
+            <span className="tnum text-sm text-faint">{groups.length} unique · {shown} total</span>
+            <div className="relative ml-auto w-72">
+              <Search size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-faint" />
+              <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search reports" className="pl-8" />
             </div>
           </div>
           {signals.error && !signals.data ? (
             <div className="p-4"><ErrorState error={signals.error} onRetry={signals.reload} /></div>
           ) : signals.loading && !signals.data ? (
             <div className="space-y-2 p-4">{[0, 1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-9" />)}</div>
-          ) : !rows.length ? (
-            <Empty title="No signals match" hint="Signals appear here as crawlers and devices report them." />
+          ) : !groups.length ? (
+            <Empty title="No reports match" hint={source || q ? "Try another source or search." : "Reports appear here as crawlers and devices send them."} />
           ) : (
             <Table>
               <thead>
                 <tr>
-                  <Th>Source</Th>
-                  <Th>Observation</Th>
-                  <Th>Severity</Th>
+                  <Th>Report</Th>
+                  <Th>Priority</Th>
                   <Th>Case</Th>
-                  <Th className="text-right">Received</Th>
+                  <Th className="text-right">Last received</Th>
                 </tr>
               </thead>
               <tbody>
-                {rows.map((s) => (
-                  <Tr key={s.id} className={cn("cursor-pointer", arrived.has(s.id) && "animate-flash")} onClick={() => setOpen(s)}>
-                    <Td><SourceBadge source={s.source} /></Td>
-                    <Td className="w-full max-w-0">
-                      <div className="truncate text-[13px] font-medium">{s.title}</div>
-                    </Td>
-                    <Td><SeverityBadge severity={s.severity} /></Td>
-                    <Td className="whitespace-nowrap">
-                      {s.case_id ? <IssueKey id={s.case_id} /> : <span className="text-faint">—</span>}
-                    </Td>
-                    <Td className="tnum whitespace-nowrap text-right text-xs text-faint">{timeAgo(s.created_at)}</Td>
-                  </Tr>
-                ))}
+                {groups.map((g) => {
+                  const meta = SOURCE_META[g.latest.source];
+                  const Icon = meta?.icon;
+                  return (
+                    <Tr key={g.key} className={cn("cursor-pointer", arrived.has(g.latest.id) && "animate-flash")} onClick={() => setOpen(g)}>
+                      <Td className="w-full max-w-0">
+                        <div className="flex items-center gap-3">
+                          <span title={meta?.label} className="flex h-7 w-7 shrink-0 items-center justify-center rounded" style={{ background: `${meta?.color ?? "#888"}1f`, color: meta?.color }}>
+                            {Icon && <Icon size={14} />}
+                          </span>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="truncate text-sm font-medium text-fg">{g.title}</span>
+                              {g.count > 1 && <span className="tnum shrink-0 rounded-full bg-fg/[0.08] px-1.5 text-xs font-semibold text-muted">×{g.count}</span>}
+                            </div>
+                            <div className="truncate text-xs text-faint">{meta?.label ?? g.latest.source}{g.latest.component ? ` · ${g.latest.component}` : ""}</div>
+                          </div>
+                        </div>
+                      </Td>
+                      <Td><SeverityBadge severity={g.latest.severity} /></Td>
+                      <Td className="whitespace-nowrap">{g.latest.case_id ? <IssueKey id={g.latest.case_id} /> : <span className="text-faint">—</span>}</Td>
+                      <Td className="tnum whitespace-nowrap text-right text-xs text-faint">{timeAgo(g.latest.created_at)}</Td>
+                    </Tr>
+                  );
+                })}
               </tbody>
             </Table>
           )}
         </Card>
-        <div className="space-y-5">
-          <AgentFeed intake={intake.data} checkingUntil={intake.checkingUntil} live={live} />
-          <ClustersPanel clusters={clusters.data} loading={clusters.loading && !clusters.data} error={clusters.error} onChange={clusters.reload} />
-        </div>
+        <ClustersPanel clusters={clusters.data} loading={clusters.loading && !clusters.data} error={clusters.error} onChange={clusters.reload} />
       </div>
-      <SignalSheet signal={open} onClose={() => setOpen(null)} />
+      <SignalSheet signal={open?.latest ?? null} count={open?.count ?? 1} onClose={() => setOpen(null)} />
+      <Sheet open={feedOpen} onOpenChange={setFeedOpen} title="Intake agent activity" description="Every check, find and triage decision, newest first" width="w-[480px]">
+        <div className="p-4"><AgentFeed intake={intake.data} checkingUntil={intake.checkingUntil} live={live} /></div>
+      </Sheet>
     </PageBody>
   );
 }
@@ -146,7 +170,7 @@ function ClustersPanel({ clusters, loading, error, onChange }: { clusters?: Clus
   };
   return (
     <Card className="h-fit">
-      <CardHeader icon={Layers} title="Clusters" description="Semantically similar signals. A cluster opens a case on its own once it crosses the reporter threshold." />
+      <CardHeader icon={Layers} title="Clusters" description="Similar reports grouped together. A cluster opens a case once enough independent people report it." />
       {error && !clusters ? (
         <div className="p-4"><ErrorState error={error} onRetry={onChange} /></div>
       ) : loading ? (
@@ -162,7 +186,7 @@ function ClustersPanel({ clusters, loading, error, onChange }: { clusters?: Clus
               <li key={c.id} className="px-4 py-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <div className="text-[13px] font-medium leading-5">{c.title}</div>
+                    <div className="text-sm font-medium leading-5">{c.title}</div>
                     <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-faint">
                       <span className="inline-flex items-center gap-1"><Tag size={11} />{c.component ?? "Unclassified"}</span>
                       {c.sw_version && <span className="inline-flex items-center gap-1"><Package size={11} />{c.sw_version}</span>}
@@ -182,14 +206,6 @@ function ClustersPanel({ clusters, loading, error, onChange }: { clusters?: Clus
                     {c.authors}<span className="text-faint">/{c.threshold} reporters</span>
                   </span>
                 </div>
-                <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1">
-                  {Object.entries(c.sources).map(([s, n]) => (
-                    <span key={s} className="inline-flex items-center gap-1.5 text-xs text-muted">
-                      <span className="h-1.5 w-1.5 rounded-[1px]" style={{ background: SOURCE_META[s as keyof typeof SOURCE_META]?.color }} />
-                      {SOURCE_META[s as keyof typeof SOURCE_META]?.label ?? s} <span className="tnum text-fg">{n}</span>
-                    </span>
-                  ))}
-                </div>
               </li>
             );
           })}
@@ -199,7 +215,7 @@ function ClustersPanel({ clusters, loading, error, onChange }: { clusters?: Clus
   );
 }
 
-function SignalSheet({ signal, onClose }: { signal: Signal | null; onClose: () => void }) {
+function SignalSheet({ signal, count, onClose }: { signal: Signal | null; count: number; onClose: () => void }) {
   const s = signal;
   const fields: [string, React.ReactNode][] = s
     ? [
@@ -221,6 +237,7 @@ function SignalSheet({ signal, onClose }: { signal: Signal | null; onClose: () =
     <Sheet open={!!s} onOpenChange={(o) => !o && onClose()} eyebrow={s ? SOURCE_META[s.source]?.label ?? s.source : undefined} title={s?.title ?? ""} description={s?.id}>
       {s && (
         <div className="space-y-6 p-5">
+          {count > 1 && <p className="rounded-md bg-accent/[0.08] px-3 py-2 text-sm text-fg">Received <b>{count} times</b> from this source. Showing the latest.</p>}
           {s.url && (
             <a href={s.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs text-accent hover:underline">
               Open original <ArrowUpRight size={11} />

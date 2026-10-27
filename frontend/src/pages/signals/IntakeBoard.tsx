@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { AlertTriangle, ArrowDownToLine, Bot, Clock, FlaskConical, FolderPlus, Inbox, Layers, Loader2, MinusCircle, Radio, ScanSearch, Sparkles, Timer, Wifi, type LucideIcon } from "lucide-react";
+import { AlertTriangle, ArrowDownToLine, Bot, Clock, FlaskConical, FolderPlus, Inbox, Layers, Loader2, MinusCircle, Radio, ScanSearch, Sparkles, Wifi, type LucideIcon } from "lucide-react";
 import { api, type F2FEvent, type Intake, type IntakeActivity, type IntakeSource, type Signal } from "@/lib/api";
 import { useApp } from "@/lib/context";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/states";
+import { Tip } from "@/components/ui/tooltip";
 import { SOURCE_META } from "@/components/domain";
 import { cn, timeAgo } from "@/lib/utils";
 
@@ -59,84 +60,78 @@ const MODE: Record<IntakeSource["mode"], { label: string; tone: "ok" | "neutral"
   push: { label: "Push", tone: "info", icon: ArrowDownToLine },
 };
 
-/** One card per intake channel. Clicking a card filters the signal list. */
-export function SourceBoard({ sources, checkingUntil, selected, onSelect }: {
+/** One compact tab per intake channel: icon, count and live state; clicking filters the list. */
+export function SourceTabs({ sources, total, checkingUntil, selected, onSelect }: {
   sources?: IntakeSource[];
+  total: number;
   checkingUntil: Record<string, number>;
   selected: string;
   onSelect: (s: string) => void;
 }) {
   const now = useNow();
-  if (!sources) return <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">{[0, 1, 2, 3, 4, 5].map((i) => <Skeleton key={i} className="h-[148px]" />)}</div>;
+  if (!sources) return <Skeleton className="h-12" />;
   return (
-    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
-      {sources.map((s) => (
-        <SourceCard key={s.source} s={s} now={now} checking={s.status === "checking" || (checkingUntil[s.source] ?? 0) > now} selected={selected === s.source} onClick={() => onSelect(selected === s.source ? "" : s.source)} />
-      ))}
+    <div role="tablist" aria-label="Filter by source" className="panel flex gap-1 overflow-x-auto p-1">
+      <button
+        role="tab"
+        aria-selected={!selected}
+        onClick={() => onSelect("")}
+        className={cn("flex h-10 shrink-0 items-center gap-2 rounded-md px-3 text-sm font-medium transition-colors", !selected ? "bg-accent/10 text-accent" : "text-muted hover:bg-fg/[0.05] hover:text-fg")}
+      >
+        All sources
+        <span className="tnum rounded-full bg-fg/[0.08] px-1.5 text-xs font-semibold">{total}</span>
+      </button>
+      <span className="my-2 w-px shrink-0 bg-border" />
+      {sources.map((s) => {
+        const meta = SOURCE_META[s.source];
+        const Icon = meta?.icon ?? Radio;
+        const checking = s.status === "checking" || (checkingUntil[s.source] ?? 0) > now;
+        const nextIn = s.next_check ? Math.max(0, Math.ceil(s.next_check - now / 1000)) : null;
+        const state = s.status === "error" ? "Check failed" : checking ? "Checking now" : s.kind === "push" ? "Listening for uploads" : nextIn != null ? `Next check in ${fmtSecs(nextIn)}` : "Waiting for first check";
+        const on = selected === s.source;
+        return (
+          <Tip key={s.source} content={`${s.label} · ${MODE[s.mode].label} · ${state}`}>
+            <button
+              role="tab"
+              aria-selected={on}
+              onClick={() => onSelect(on ? "" : s.source)}
+              className={cn("flex h-10 shrink-0 items-center gap-2 rounded-md px-2.5 text-sm transition-colors", on ? "bg-accent/10 text-accent" : "text-fg hover:bg-fg/[0.05]")}
+            >
+              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded" style={{ background: `${meta?.color ?? "#888"}1f`, color: meta?.color }}>
+                <Icon size={14} />
+              </span>
+              <span className="whitespace-nowrap font-medium">{s.label}</span>
+              <span className="tnum text-xs text-faint">{s.total ?? 0}</span>
+              <span className="flex w-3 shrink-0 justify-center">
+                {s.status === "error" ? (
+                  <AlertTriangle size={12} className="text-bad" />
+                ) : checking ? (
+                  <Loader2 size={12} className="animate-spin text-accent" />
+                ) : (
+                  <span className={cn("h-2 w-2 rounded-full", s.kind === "push" ? "animate-pulseSoft bg-info" : s.mode === "live" ? "bg-ok" : "border border-strong")} />
+                )}
+              </span>
+            </button>
+          </Tip>
+        );
+      })}
     </div>
   );
 }
 
-function SourceCard({ s, now, checking, selected, onClick }: { s: IntakeSource; now: number; checking: boolean; selected: boolean; onClick: () => void }) {
-  const meta = SOURCE_META[s.source];
-  const Icon = meta?.icon ?? Radio;
-  const ModeIcon = MODE[s.mode].icon;
-  const color = meta?.color ?? "#888";
-  const nextIn = s.next_check ? Math.max(0, Math.ceil(s.next_check - now / 1000)) : null;
-  const progress = s.interval && nextIn != null ? 1 - nextIn / s.interval : 0;
-  const recent = s.last_signal_at != null && now / 1000 - s.last_signal_at < 60;
-
-  let status: React.ReactNode;
-  if (s.status === "error") status = <span className="flex items-center gap-1.5 text-bad"><AlertTriangle size={12} />Check failed</span>;
-  else if (checking) status = <span className="flex items-center gap-1.5 text-accent"><ScanSearch size={12} className="animate-pulseSoft" />Checking now…<Loader2 size={11} className="animate-spin" /></span>;
-  else if (s.kind === "push")
-    status = (
-      <span className="flex items-center gap-1.5 text-info">
-        <Radio size={12} className="animate-pulseSoft" />
-        Listening for uploads
-      </span>
-    );
-  else status = <span className="tnum flex items-center gap-1.5 text-muted"><Timer size={12} className="text-ok" />{nextIn != null ? `Next check in ${fmtSecs(nextIn)}` : "Waiting for first check"}</span>;
-
+/** One-line agent status for a page header; opens the full activity log. */
+export function AgentStatus({ intake, checkingUntil, live, onClick }: { intake?: Intake; checkingUntil: Record<string, number>; live: boolean; onClick: () => void }) {
+  const now = useNow();
+  const current = intake?.sources.find((s) => s.status === "checking" || (checkingUntil[s.source] ?? 0) > now);
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      title={s.error ?? s.target}
-      className={cn(
-        "panel relative flex flex-col overflow-hidden p-4 text-left transition-[box-shadow,border-color] hover:border-strong",
-        selected && "border-accent ring-2 ring-accent/30",
-        checking && "border-accent/50",
-      )}
-    >
-      <div className="flex items-start gap-3">
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md" style={{ background: `${color}1f`, color }}>
-          <Icon size={18} strokeWidth={2} />
-        </span>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center justify-between gap-2">
-            <span className="truncate text-sm font-semibold">{s.label}</span>
-            <Badge tone={MODE[s.mode].tone}><ModeIcon size={11} strokeWidth={2.5} />{MODE[s.mode].label}</Badge>
-          </div>
-          <div className="mt-0.5 truncate text-xs text-faint">{s.target}</div>
-        </div>
-      </div>
-      <div className="mt-4 flex items-end justify-between gap-2">
-        <div>
-          <div className="tnum flex items-center gap-1.5 text-2xl font-semibold leading-7"><Inbox size={16} className="text-faint" />{s.total ?? 0}</div>
-          <div className="tnum mt-0.5 text-xs text-faint">{s.last_24h ?? 0} in 24h</div>
-        </div>
-        <div className={cn("flex items-center gap-1 text-xs", recent ? "font-medium text-accent" : "text-faint")} title="Last report">
-          <Clock size={12} />
-          {s.last_signal_at ? timeAgo(s.last_signal_at) : "No reports yet"}
-        </div>
-      </div>
-      <div className="mt-3 border-t border-border pt-2.5 text-xs">{status}</div>
-      {s.kind === "poll" && (
-        <span className="absolute inset-x-0 bottom-0 h-[3px] bg-subtle">
-          <span className={cn("block h-full transition-[width] duration-1000 ease-linear", checking ? "w-full animate-pulseSoft bg-accent" : "bg-accent/40")} style={checking ? undefined : { width: `${Math.round(progress * 100)}%` }} />
-        </span>
-      )}
+    <button onClick={onClick} className="inline-flex h-8 items-center gap-2 rounded-full border border-border bg-surface pl-2 pr-3 text-sm shadow-card hover:border-strong">
+      <span className="relative flex h-5 w-5 items-center justify-center rounded-full bg-accent/10 text-accent">
+        <Bot size={12} />
+        <span className={cn("absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full border border-surface", live ? "bg-ok" : "bg-warn")} />
+      </span>
+      <span className="font-medium">Intake agent</span>
+      <span className="max-w-[220px] truncate text-muted">{current ? `checking ${current.label}…` : live ? "watching" : "polling"}</span>
+      <span className="text-xs font-medium text-accent">Activity</span>
     </button>
   );
 }
