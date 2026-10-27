@@ -12,8 +12,16 @@ from .trackers import issue_tracker
 
 def catalog() -> list[dict]:
     live = settings.mode == "aws"
+    jira_inbound = bool(settings.jira_url and settings.jira_email and settings.jira_token)
     entries: list[tuple[ConnectorInfo, list[str]]] = [
         (field_discovery_connector().info, ["field_discovery"]),
+        (ConnectorInfo("discovery_agent", "Field Discovery Agent", "Field-to-Fix", "signal_source",
+                       f"Standalone agent: crawls forums, Reddit, NHTSA, Google tracker, partner/JIRA and web for "
+                       f"{settings.discovery_oem} software issues, filters with Bedrock, and opens cases via the signal pipeline."
+                       + (" Inbound JIRA ticket detection active." if jira_inbound else ""),
+                       "connected" if llm.available() else "simulated",
+                       ["DISCOVERY_OEM", "DISCOVERY_MODELS", "DISCOVERY_INTERVAL", "DISCOVERY_PROMOTE", "TAVILY_API_KEY"]),
+         ["field_discovery", "detect"]),
         (ConnectorInfo("reddit", "Reddit", "Reddit", "signal_source", "Subreddit search for owner complaints (r/AndroidAuto, brand subs).",
                        "connected" if settings.reddit_live else "simulated", ["F2F_REDDIT_QUERY"]), ["detect"]),
         (ConnectorInfo("owners_forum", "Owners forum", "DriveTalk", "signal_source", "Brand owners forum crawled via AgentCore Browser.",

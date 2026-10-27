@@ -8,6 +8,7 @@ import asyncio
 import io
 import json
 import logging
+import os
 import re
 import tarfile
 import threading
@@ -48,6 +49,10 @@ async def lifespan(app: FastAPI):
             c.status = CaseStatus.failed
             store.put_case(c)
     threading.Thread(target=crawl_loop, args=(_stop,), daemon=True, name="crawlers").start()
+    if os.environ.get("DISCOVERY_AUTOSTART", "0") == "1":
+        from .discovery import run_forever as _discovery_loop
+        threading.Thread(target=_discovery_loop, args=(_stop,), daemon=True, name="discovery").start()
+        log.info("Field Discovery Agent autostart enabled (interval=%ss)", settings.discovery_interval)
     log.info("Loopback console up: mode=%s llm=%s", settings.mode, llm.mode())
     yield
     _stop.set()
@@ -138,6 +143,36 @@ def promote(cid: str):
     if c.get("case_id"):
         return store.get_case(c["case_id"])
     return open_case(c, "promoted manually from the Signals inbox")
+
+
+# Field Discovery Agent ---------------------------------------------------------------------------
+class DiscoverIn(BaseModel):
+    oem: str | None = None
+    models: list[str] | None = None
+    since_days: int | None = None
+    promote: bool | None = None
+
+
+@app.post("/api/discovery/run")
+def discovery_run(body: DiscoverIn | None = None):
+    """Run one discovery cycle now: crawl sources, filter for the OEM, and report issues to the
+    signal pipeline (which clusters them and opens cases). Returns the cycle summary."""
+    from .discovery import run_once
+    body = body or DiscoverIn()
+    kw = {k: v for k, v in body.model_dump().items() if v is not None}
+    # Report straight into this app's signal pipeline (no HTTP round-trip to ourselves).
+    kw["in_process"] = True
+    return run_once(**kw)
+
+
+@app.get("/api/discovery/config")
+def discovery_config():
+    return {"oem": settings.discovery_oem, "models": settings.discovery_models,
+            "interval_s": settings.discovery_interval, "since_days": settings.discovery_since_days,
+            "promote": settings.discovery_promote, "autostart": os.environ.get("DISCOVERY_AUTOSTART", "0") == "1",
+            "jira_inbound": bool(settings.jira_url and settings.jira_email and settings.jira_token),
+            "web_search": bool(settings.tavily_api_key), "reddit_live": settings.reddit_live,
+            "llm": llm.mode()}
 
 
 # Cases -------------------------------------------------------------------------------------------

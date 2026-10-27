@@ -41,6 +41,20 @@ class Settings:
     demo_pace = float(_env("F2F_DEMO_PACE", "1.0"))  # multiplies cosmetic delays between agent steps
     auto_approve = _env("F2F_AUTO_APPROVE", "0") == "1"
 
+    # --- Field Discovery Agent (standalone crawler that pings the app) --------------------------
+    # The OEM whose complaints we filter for, and the models we care about (comma separated).
+    discovery_oem = _env("DISCOVERY_OEM", "Stellantis")
+    discovery_models = [m.strip() for m in (_env("DISCOVERY_MODELS", "Jeep,Dodge,RAM,Chrysler,Uconnect") or "").split(",") if m.strip()]
+    # Where the agent posts detected issues. Defaults to the local app.
+    discovery_app_url = _env("DISCOVERY_APP_URL", "http://127.0.0.1:8000")
+    discovery_interval = int(_env("DISCOVERY_INTERVAL", "900"))   # seconds between crawl cycles
+    discovery_since_days = int(_env("DISCOVERY_SINCE_DAYS", "90"))
+    # When set, the agent forces a case open on the resulting cluster instead of waiting for threshold.
+    discovery_promote = _env("DISCOVERY_PROMOTE", "0") == "1"
+    discovery_max_per_source = int(_env("DISCOVERY_MAX_PER_SOURCE", "8"))
+    # Optional web search key (shared with the Lambda handler). Live when present, simulated otherwise.
+    tavily_api_key = _env("TAVILY_API_KEY")
+
 
 settings = Settings()
 for d in (settings.state_dir, settings.artifacts_dir, settings.workspace_dir, settings.keys_dir):
