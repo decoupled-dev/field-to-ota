@@ -6,16 +6,20 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans: ["Geist", "ui-sans-serif", "system-ui", "sans-serif"],
-        mono: ["Geist Mono", "ui-monospace", "SFMono-Regular", "Menlo", "monospace"],
+        sans: ["Inter", "-apple-system", "BlinkMacSystemFont", "Segoe UI", "Roboto", "Helvetica Neue", "sans-serif"],
+        mono: ["JetBrains Mono", "ui-monospace", "SFMono-Regular", "Menlo", "monospace"],
       },
       fontSize: {
-        "2xs": ["10.5px", "14px"],
-        xs: ["11.5px", "16px"],
-        sm: ["13px", "20px"],
-        base: ["14px", "22px"],
+        "2xs": ["11px", "16px"],
+        xs: ["12px", "16px"],
+        sm: ["14px", "20px"],
+        base: ["14px", "20px"],
       },
-      borderRadius: { DEFAULT: "3px", sm: "2px", md: "4px", lg: "5px" },
+      borderRadius: { DEFAULT: "4px", sm: "3px", md: "6px", lg: "8px" },
+      boxShadow: {
+        card: "0 1px 1px hsl(var(--shadow) / 0.25), 0 0 1px hsl(var(--shadow) / 0.31)",
+        overlay: "0 8px 12px hsl(var(--shadow) / 0.15), 0 0 1px hsl(var(--shadow) / 0.31)",
+      },
       colors: {
         bg: v("bg"),
         surface: v("surface"),
@@ -33,6 +37,10 @@ export default {
         warn: v("warn"),
         bad: v("bad"),
         info: v("info"),
+        nav: v("nav"),
+        "nav-fg": v("nav-fg"),
+        "nav-muted": v("nav-muted"),
+        "nav-hover": v("nav-hover"),
       },
       keyframes: {
         pulseRing: { "0%,100%": { opacity: "1" }, "50%": { opacity: ".35" } },

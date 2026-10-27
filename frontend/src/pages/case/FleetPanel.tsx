@@ -113,7 +113,7 @@ function Rollout({ f }: { f: Fleet }) {
           <div className="tnum mt-1 text-[44px] font-light leading-none tracking-[-0.04em]">
             {pct}<span className="ml-0.5 text-[22px] text-muted">%</span>
           </div>
-          <div className="mt-2 font-mono text-2xs uppercase tracking-[0.06em] text-faint">{r.succeeded} of {r.targeted || f.affected_vins} vehicles</div>
+          <div className="mt-2 text-xs text-faint">{r.succeeded} of {r.targeted || f.affected_vins} vehicles</div>
         </div>
         <div className="min-w-0">
           <div className="grid gap-[3px]" style={{ gridTemplateColumns: `repeat(${CELLS / 2}, minmax(0, 1fr))` }}>

@@ -1,14 +1,14 @@
 import { Link } from "react-router-dom";
-import { ArrowRight } from "lucide-react";
 import { api } from "@/lib/api";
 import { useAsync, useEventStream } from "@/lib/hooks";
 import { useApp } from "@/lib/context";
 import { PageBody, PageHeader } from "@/components/layout/Page";
 import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Empty, ErrorState, Skeleton } from "@/components/ui/states";
 import { Table, Td, Th, Tr } from "@/components/ui/table";
 import { CaseStatusChip, SeverityBadge, StageStrip, inferStageStatuses } from "@/components/domain";
-import { cn, fmtTime, timeAgo } from "@/lib/utils";
+import { timeAgo } from "@/lib/utils";
 
 export default function CasesPage() {
   const cases = useAsync(api.cases, [], 10000);
@@ -20,9 +20,9 @@ export default function CasesPage() {
   return (
     <PageBody>
       <PageHeader
-        eyebrow={cases.data ? <><span className="text-fg">{open}</span> open · {cases.data.length - open} closed</> : "Cases"}
         title="Cases"
         description="Each case is one field defect taken through the closed-loop pipeline, from first report to verified OTA."
+        actions={cases.data && <><Badge tone="run">{open} open</Badge><Badge>{cases.data.length - open} closed</Badge></>}
       />
       <Card>
         {cases.error && !cases.data ? (
@@ -39,12 +39,8 @@ export default function CasesPage() {
                 <Th>Title</Th>
                 <Th>Status</Th>
                 <Th>Severity</Th>
-                <Th>Component</Th>
-                <Th>Software</Th>
                 <Th>Pipeline</Th>
-                <Th className="text-right">Affected</Th>
-                <Th className="text-right">Fixed</Th>
-                <Th className="text-right">Opened</Th>
+                <Th className="text-right">Fixed / affected</Th>
                 <Th className="text-right">Updated</Th>
               </tr>
             </thead>
@@ -52,19 +48,12 @@ export default function CasesPage() {
               {cases.data.map((c) => (
                 <Tr key={c.id}>
                   <Td className="font-mono text-[12px]"><Link to={`/cases/${c.id}`} className="hover:text-accent">{c.id}</Link></Td>
-                  <Td className="max-w-[380px] truncate text-[13px] font-medium"><Link to={`/cases/${c.id}`} className="hover:text-accent">{c.title}</Link></Td>
+                  <Td className="max-w-[520px] truncate text-[13px] font-medium"><Link to={`/cases/${c.id}`} className="hover:text-accent">{c.title}</Link></Td>
                   <Td><CaseStatusChip status={c.status} /></Td>
                   <Td><SeverityBadge severity={c.severity} /></Td>
-                  <Td className="font-mono text-[12px] text-muted">{c.component ?? "—"}</Td>
-                  <Td className="whitespace-nowrap font-mono text-[12px]">
-                    {c.sw_version ?? "—"}
-                    {c.fixed_version && <><ArrowRight size={11} className="mx-1 inline text-faint" /><span className="text-ok">{c.fixed_version}</span></>}
-                  </Td>
                   <Td><StageStrip stages={stages} runs={inferStageStatuses(stages, c.current_stage, c.status)} /></Td>
-                  <Td className="tnum text-right font-mono text-[12.5px]">{c.affected_vins}</Td>
-                  <Td className={cn("tnum text-right font-mono text-[12.5px]", c.fixed_vins ? "text-ok" : "text-faint")}>{c.fixed_vins}</Td>
-                  <Td className="tnum whitespace-nowrap text-right font-mono text-2xs text-faint">{fmtTime(c.created_at)}</Td>
-                  <Td className="tnum whitespace-nowrap text-right font-mono text-2xs text-faint">{timeAgo(c.updated_at)}</Td>
+                  <Td className="tnum text-right"><span className={c.fixed_vins ? "text-ok" : "text-faint"}>{c.fixed_vins}</span><span className="text-faint"> / {c.affected_vins}</span></Td>
+                  <Td className="tnum whitespace-nowrap text-right text-xs text-faint">{timeAgo(c.updated_at)}</Td>
                 </Tr>
               ))}
             </tbody>

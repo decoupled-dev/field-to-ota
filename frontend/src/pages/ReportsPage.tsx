@@ -18,7 +18,7 @@ export default function ReportsPage() {
   const cases = useAsync(api.cases, []);
   return (
     <PageBody>
-      <PageHeader eyebrow="Audit & hand-off" title="Reports" description="Generated per case from the pipeline record. Open a report and print to PDF for audit, homologation or supplier hand-off." />
+      <PageHeader title="Reports" description="Generated per case from the pipeline record. Open a report and print to PDF for audit, homologation or supplier hand-off." />
       {cases.error && !cases.data ? (
         <ErrorState error={cases.error} onRetry={cases.reload} />
       ) : !cases.data ? (
@@ -56,7 +56,7 @@ function CaseReports({ c }: { c: Case }) {
             >
               <div className="flex items-center gap-2">
                 <span className="rounded-sm bg-fg px-1.5 py-0.5 font-mono text-[9.5px] font-medium tracking-[0.1em] text-bg">{CODE[r.type] ?? r.type.slice(0, 3).toUpperCase()}</span>
-                <span className="font-mono text-2xs uppercase tracking-[0.06em] text-faint">{c.id}</span>
+                <span className="text-xs text-faint">{c.id}</span>
               </div>
               <div className="mt-4 flex items-center gap-1.5 text-[15px] font-semibold tracking-tight">
                 {r.title}

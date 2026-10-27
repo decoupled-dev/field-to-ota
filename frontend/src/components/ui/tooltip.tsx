@@ -7,7 +7,7 @@ export function Tip({ content, children }: { content: React.ReactNode; children:
     <T.Root delayDuration={150}>
       <T.Trigger asChild>{children}</T.Trigger>
       <T.Portal>
-        <T.Content sideOffset={6} className="z-50 max-w-xs rounded-sm border border-strong bg-raised px-2 py-1 font-mono text-2xs text-fg shadow-xl">
+        <T.Content sideOffset={6} className="z-50 max-w-xs rounded-sm bg-[hsl(218_54%_20%)] px-2 py-1 text-xs text-white shadow-overlay dark:bg-[hsl(210_24%_87%)] dark:text-[hsl(210_12%_13%)]">
           {content}
         </T.Content>
       </T.Portal>

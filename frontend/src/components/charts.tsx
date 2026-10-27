@@ -15,11 +15,11 @@ import {
 import type { ChartContent } from "@/lib/api";
 
 // Ordered for adjacent contrast on both themes; accent first so a single series reads as "the signal".
-export const SERIES_COLORS = ["hsl(var(--accent))", "#4cc9f0", "#9d8cff", "hsl(var(--ok))", "#f7c948", "#a3abb8"];
+export const SERIES_COLORS = ["hsl(var(--accent))", "#2898BD", "#8F7EE7", "hsl(var(--ok))", "#E2B203", "#8590A2"];
 
 export const axis = {
   stroke: "hsl(var(--border))",
-  tick: { fill: "hsl(var(--faint))", fontSize: 10, fontFamily: "Geist Mono, ui-monospace, monospace" },
+  tick: { fill: "hsl(var(--faint))", fontSize: 10, fontFamily: "Inter, system-ui, sans-serif" },
   tickLine: false,
 } as const;
 
@@ -28,15 +28,15 @@ export const grid = <CartesianGrid stroke="hsl(var(--border))" strokeDasharray="
 export const tooltipProps = {
   contentStyle: {
     background: "hsl(var(--raised))",
-    border: "1px solid hsl(var(--strong))",
-    borderRadius: 3,
+    border: "1px solid hsl(var(--border))",
+    borderRadius: 4,
     fontSize: 11,
-    fontFamily: "Geist Mono, ui-monospace, monospace",
+    fontFamily: "Inter, system-ui, sans-serif",
     color: "hsl(var(--fg))",
-    boxShadow: "0 10px 30px rgb(0 0 0 / 0.25)",
+    boxShadow: "0 8px 12px rgb(9 30 66 / 0.15), 0 0 1px rgb(9 30 66 / 0.31)",
     padding: "6px 10px",
   },
-  labelStyle: { color: "hsl(var(--muted))", marginBottom: 4, textTransform: "uppercase" as const, letterSpacing: "0.06em" },
+  labelStyle: { color: "hsl(var(--muted))", marginBottom: 4, fontWeight: 600 },
   itemStyle: { padding: 0 },
   cursor: { fill: "hsl(var(--fg) / 0.04)", stroke: "hsl(var(--strong))" },
 } as const;
@@ -45,7 +45,7 @@ const legend = (
   <Legend
     iconType="square"
     iconSize={7}
-    wrapperStyle={{ fontSize: 10, color: "hsl(var(--muted))", fontFamily: "Geist Mono, ui-monospace, monospace", textTransform: "uppercase", letterSpacing: "0.06em", paddingTop: 6 }}
+    wrapperStyle={{ fontSize: 10, color: "hsl(var(--muted))", fontFamily: "Inter, system-ui, sans-serif", textTransform: "uppercase", letterSpacing: "0.06em", paddingTop: 6 }}
   />
 );
 

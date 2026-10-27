@@ -44,7 +44,6 @@ export default function SignalsPage() {
   return (
     <PageBody>
       <PageHeader
-        eyebrow="Intake"
         title="Signals"
         description="Every observation from social channels, public trackers and in-vehicle hu-sentinel daemons, normalized and triaged into one schema."
       />
@@ -61,7 +60,7 @@ export default function SignalsPage() {
                 <SourceFilter key={s} active={source === s} onClick={() => setSource(s)} label={SOURCE_META[s].label} n={counts[s]} color={SOURCE_META[s].color} />
               ))}
             </div>
-            <span className="tnum ml-auto font-mono text-2xs uppercase tracking-[0.06em] text-faint">{rows.length} shown</span>
+            <span className="tnum ml-auto text-xs text-faint">{rows.length} shown</span>
           </div>
           {signals.error && !signals.data ? (
             <div className="p-4"><ErrorState error={signals.error} onRetry={signals.reload} /></div>
@@ -75,8 +74,6 @@ export default function SignalsPage() {
                 <tr>
                   <Th>Source</Th>
                   <Th>Observation</Th>
-                  <Th className="hidden 2xl:table-cell">Component</Th>
-                  <Th>SW</Th>
                   <Th>Severity</Th>
                   <Th>Case</Th>
                   <Th className="text-right">Received</Th>
@@ -86,19 +83,16 @@ export default function SignalsPage() {
                 {rows.map((s) => (
                   <Tr key={s.id} className="cursor-pointer" onClick={() => setOpen(s)}>
                     <Td><SourceBadge source={s.source} /></Td>
-                    <Td className="max-w-[360px]">
+                    <Td className="w-full max-w-0">
                       <div className="truncate text-[13px] font-medium">{s.title}</div>
-                      <div className="truncate font-mono text-2xs text-faint">{s.author ?? s.vin ?? ""}</div>
                     </Td>
-                    <Td className="hidden whitespace-nowrap font-mono text-[12px] 2xl:table-cell">{s.component ?? <span className="text-faint">—</span>}</Td>
-                    <Td className="whitespace-nowrap font-mono text-[12px]">{s.sw_version ?? <span className="text-faint">—</span>}</Td>
                     <Td><SeverityBadge severity={s.severity} /></Td>
                     <Td className="whitespace-nowrap font-mono text-[12px]">
                       {s.case_id ? (
                         <Link to={`/cases/${s.case_id}`} onClick={(e) => e.stopPropagation()} className="text-accent hover:underline">{s.case_id}</Link>
                       ) : <span className="text-faint">—</span>}
                     </Td>
-                    <Td className="tnum whitespace-nowrap text-right font-mono text-2xs text-faint">{timeAgo(s.created_at)}</Td>
+                    <Td className="tnum whitespace-nowrap text-right text-xs text-faint">{timeAgo(s.created_at)}</Td>
                   </Tr>
                 ))}
               </tbody>
@@ -117,7 +111,7 @@ function SourceFilter({ active, onClick, label, n, color }: { active: boolean; o
     <button
       onClick={onClick}
       className={cn(
-        "inline-flex h-7 items-center gap-1.5 rounded border px-2 font-mono text-2xs uppercase tracking-[0.05em] transition-colors",
+        "inline-flex h-7 items-center gap-1.5 rounded border px-2 text-xs transition-colors",
         active ? "border-strong bg-raised text-fg" : "border-transparent text-muted hover:text-fg",
       )}
     >
@@ -178,7 +172,7 @@ function ClustersPanel({ clusters, loading, error, onChange }: { clusters?: Clus
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <div className="text-[13px] font-medium leading-5">{c.title}</div>
-                    <div className="mt-1 font-mono text-2xs uppercase tracking-[0.04em] text-faint">
+                    <div className="mt-1 text-xs text-faint">
                       {[c.component, c.sw_version].filter(Boolean).join(" · ") || "Unclassified"} · {c.authors} authors · {timeAgo(c.last_seen)}
                     </div>
                   </div>
@@ -199,7 +193,7 @@ function ClustersPanel({ clusters, loading, error, onChange }: { clusters?: Clus
                 </div>
                 <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1">
                   {Object.entries(c.sources).map(([s, n]) => (
-                    <span key={s} className="inline-flex items-center gap-1.5 font-mono text-2xs uppercase tracking-[0.04em] text-muted">
+                    <span key={s} className="inline-flex items-center gap-1.5 text-xs text-muted">
                       <span className="h-1.5 w-1.5 rounded-[1px]" style={{ background: SOURCE_META[s as keyof typeof SOURCE_META]?.color }} />
                       {SOURCE_META[s as keyof typeof SOURCE_META]?.label ?? s} <span className="tnum text-fg">{n}</span>
                     </span>
@@ -237,7 +231,7 @@ function SignalSheet({ signal, onClose }: { signal: Signal | null; onClose: () =
       {s && (
         <div className="space-y-6 p-5">
           {s.url && (
-            <a href={s.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-mono text-2xs uppercase tracking-[0.06em] text-accent hover:underline">
+            <a href={s.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs text-accent hover:underline">
               Open original <ArrowUpRight size={11} />
             </a>
           )}
@@ -245,7 +239,7 @@ function SignalSheet({ signal, onClose }: { signal: Signal | null; onClose: () =
           <dl className="divide-y divide-border overflow-hidden rounded border border-border">
             {fields.map(([k, v]) => (
               <div key={k} className="grid grid-cols-[150px_1fr] items-center gap-4 px-3 py-2">
-                <dt className="font-mono text-2xs uppercase tracking-[0.05em] text-faint">{k}</dt>
+                <dt className="text-xs text-faint">{k}</dt>
                 <dd className="min-w-0 break-words text-[13px]">{v}</dd>
               </div>
             ))}

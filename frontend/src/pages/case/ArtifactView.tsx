@@ -63,10 +63,10 @@ export function ArtifactView({ artifact }: { artifact: Artifact }) {
   return (
     <div className="overflow-hidden rounded border border-border">
       <div className="flex items-center gap-2 border-b border-border bg-raised px-3 py-2">
-        <span className="rounded-sm border border-border px-1.5 font-mono text-[9.5px] uppercase tracking-[0.08em] text-muted">{kind}</span>
+        <span className="rounded-sm border border-border px-1.5 text-[11px] font-bold uppercase text-muted">{kind}</span>
         <span className="truncate text-[12.5px] font-medium">{name}</span>
         {path && (
-          <a href={artifactUrl(path)} target="_blank" rel="noreferrer" className="ml-auto inline-flex shrink-0 items-center gap-1 font-mono text-2xs uppercase tracking-[0.06em] text-accent hover:underline">
+          <a href={artifactUrl(path)} target="_blank" rel="noreferrer" className="ml-auto inline-flex shrink-0 items-center gap-1 text-xs text-accent hover:underline">
             <Download size={11} />
             Download
           </a>

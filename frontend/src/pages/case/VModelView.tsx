@@ -53,7 +53,7 @@ const isLive = (s?: StageStatus) => s === "running" || s === "awaiting_approval"
 export function VModelView({ stages, runs, selected, onSelect }: { stages: StageDef[]; runs: Record<string, StageRun>; selected: string | null; onSelect: (k: string) => void }) {
   // Unknown (future) stages get a slot along the bottom-left so the view stays extensible.
   let extra = 0;
-  const placed = stages.map((s, i) => ({ s, i, ...(POS[s.key] ?? { p: [60 + extra++ * 60, H - 24] as P, label: "above" as Side }) }));
+  const placed = stages.map((s, i) => ({ s, i, ...(POS[s.key] ?? { p: [60 + extra++ * 150, H - 24] as P, label: "right" as Side }) }));
 
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="block h-auto w-full select-none" role="img" aria-label="V-model view of the pipeline">
@@ -71,20 +71,17 @@ export function VModelView({ stages, runs, selected, onSelect }: { stages: Stage
       {LEVELS.map((l) => (
         <g key={l.y}>
           <line x1={12} x2={W - 12} y1={l.y} y2={l.y} stroke="hsl(var(--border))" strokeDasharray="1 5" />
-          {l.left && <text x={12} y={l.y - 8} fontSize={10.5} className="fill-faint font-mono uppercase" letterSpacing={1}>{l.left}</text>}
-          {l.right && <text x={W - 12} y={l.y - 8} fontSize={10.5} textAnchor="end" className="fill-faint font-mono uppercase" letterSpacing={1}>{l.right}</text>}
+          {l.left && <text x={12} y={l.y - 8} fontSize={11} className="fill-faint font-sans">{l.left}</text>}
+          {l.right && <text x={W - 12} y={l.y - 8} fontSize={11} textAnchor="end" className="fill-faint font-sans">{l.right}</text>}
         </g>
       ))}
 
       {/* field band */}
-      <rect x={420} y={14} width={580} height={84} rx={4} fill="hsl(var(--accent) / 0.04)" stroke="hsl(var(--accent) / 0.35)" strokeDasharray="3 4" />
-      <text x={408} y={Y.field + 3} fontSize={9.5} textAnchor="end" className="fill-accent font-mono uppercase" letterSpacing={1.2}>Field ▸</text>
+      <rect x={420} y={14} width={580} height={84} rx={4} fill="hsl(var(--accent) / 0.04)" stroke="hsl(var(--accent) / 0.2)" />
 
       {/* the V */}
       <path d={`M ${TOP_L} L ${BOTTOM} L ${TOP_R}`} fill="none" stroke="url(#vm-band)" strokeWidth={44} strokeLinejoin="round" strokeLinecap="round" />
       <path d={`M ${TOP_L} L ${BOTTOM} L ${TOP_R}`} fill="none" stroke="hsl(var(--strong))" strokeWidth={1} strokeDasharray="1 4" />
-      <text x={(TOP_L[0] + BOTTOM[0]) / 2 - 120} y={Y.l4 + 28} fontSize={9.5} className="fill-faint font-mono uppercase" letterSpacing={1}>◂ specify &amp; build</text>
-      <text x={(TOP_R[0] + BOTTOM[0]) / 2 + 120} y={Y.l4 + 28} fontSize={9.5} textAnchor="end" className="fill-faint font-mono uppercase" letterSpacing={1}>verify &amp; validate ▸</text>
 
       {/* flow */}
       {placed.slice(1).map((cur, k) => {
@@ -98,11 +95,6 @@ export function VModelView({ stages, runs, selected, onSelect }: { stages: Stage
         return (
           <g key={cur.s.key}>
             <path d={d} fill="none" stroke={stroke} strokeWidth={active ? 2 : 1.5} strokeDasharray={active ? "6 6" : done ? undefined : "3 4"} className={active ? "svg-flow" : undefined} markerEnd="url(#vm-arrow)" />
-            {cur.s.key === "rca" && (
-              <text x={(prev.p[0] + cur.p[0]) / 2} y={cur.p[1] - 10} fontSize={9.5} textAnchor="middle" className="fill-faint font-mono uppercase" letterSpacing={1}>
-                root cause crosses to the left
-              </text>
-            )}
           </g>
         );
       })}
@@ -176,9 +168,11 @@ function Node({ def, index, run, p, side, selected, onSelect }: { def: StageDef;
       <text x={lx} y={ly} textAnchor={anchor} fontSize={14} fontWeight={600} fill={pending ? "hsl(var(--muted))" : "hsl(var(--fg))"} letterSpacing={-0.2}>
         {def.name}
       </text>
-      <text x={lx} y={ly + 15} textAnchor={anchor} fontSize={10.5} fill={t.text} className="font-mono uppercase" letterSpacing={0.8}>
-        {sub}
-      </text>
+      {(status === "running" || status === "awaiting_approval" || status === "failed") && (
+        <text x={lx} y={ly + 15} textAnchor={anchor} fontSize={11} fill={t.text} className="font-sans font-semibold">
+          {sub}
+        </text>
+      )}
     </g>
   );
 }

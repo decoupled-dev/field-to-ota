@@ -1,16 +1,16 @@
 import { useCallback, useEffect, useMemo } from "react";
-import { Link, useParams, useSearchParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import { ArrowRight } from "lucide-react";
 import { api, type Case, type CaseDetail, type F2FEvent, type LogLine, type StageRun } from "@/lib/api";
 import { useAsync, useEventStream } from "@/lib/hooks";
 import { useApp } from "@/lib/context";
-import { PageBody } from "@/components/layout/Page";
+import { Breadcrumbs, PageBody } from "@/components/layout/Page";
 import { Card, CardHeader } from "@/components/ui/card";
 import { Segmented, TabCount, Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ErrorState, Skeleton, Empty } from "@/components/ui/states";
 import { Table, Td, Th, Tr } from "@/components/ui/table";
 import { CaseStatusChip, LinkChip, SeverityBadge, SourceBadge } from "@/components/domain";
-import { cn, fmtClock, fmtTime, timeAgo } from "@/lib/utils";
+import { cn, fmtClock, timeAgo } from "@/lib/utils";
 import { StageTape } from "./StageTape";
 import { VModelView } from "./VModelView";
 import { TimelineView } from "./TimelineView";
@@ -177,7 +177,7 @@ function applyEvent(prev: CaseDetail, e: F2FEvent): CaseDetail {
 function CaseHeader({ c, live }: { c: Case; live: boolean }) {
   const fixedPct = c.affected_vins ? Math.round((c.fixed_vins / c.affected_vins) * 100) : 0;
   const spec: [string, React.ReactNode][] = [
-    ["Component", <span className="font-mono text-[12.5px]">{c.component ?? "—"}</span>],
+    ["Component", <span>{c.component ?? "—"}</span>],
     [
       "Software",
       <span className="inline-flex items-center gap-1.5 font-mono text-[12.5px]">
@@ -190,11 +190,10 @@ function CaseHeader({ c, live }: { c: Case; live: boolean }) {
         )}
       </span>,
     ],
-    ["Vehicle", <span className="text-[12.5px]">{c.vehicle_model ?? "—"}</span>],
     [
       "Fleet impact",
       <span className="block">
-        <span className="tnum font-mono text-[12.5px]">
+        <span className="tnum">
           {c.affected_vins} <span className="text-faint">affected ·</span> <span className={c.fixed_vins ? "text-ok" : ""}>{c.fixed_vins}</span> <span className="text-faint">fixed</span>
         </span>
         <span className="mt-1.5 block h-[3px] w-full max-w-[180px] overflow-hidden rounded-full bg-subtle">
@@ -202,27 +201,24 @@ function CaseHeader({ c, live }: { c: Case; live: boolean }) {
         </span>
       </span>,
     ],
-    ["Opened", <span className="tnum font-mono text-[12.5px]">{fmtTime(c.created_at)}</span>],
-    ["Updated", <span className="tnum font-mono text-[12.5px]">{timeAgo(c.updated_at)}</span>],
+    ["Updated", <span className="tnum">{timeAgo(c.updated_at)}</span>],
   ];
   return (
     <div>
-      <div className="label flex items-center gap-2">
-        <Link to="/cases" className="hover:text-fg">Cases</Link>
-        <span className="text-faint">/</span>
-        <span className="text-fg">{c.id}</span>
-        <span className="ml-auto inline-flex items-center gap-1.5">
-          <span className={cn("h-1.5 w-1.5 rounded-full", live ? "animate-pulseSoft bg-ok" : "bg-warn")} />
+      <div className="flex items-center gap-3">
+        <Breadcrumbs items={[{ label: "Cases", to: "/cases" }, { label: <span className="font-mono">{c.id}</span> }]} />
+        <span className="ml-auto inline-flex items-center gap-1.5 text-xs text-faint">
+          <span className={cn("h-2 w-2 rounded-full", live ? "animate-pulseSoft bg-ok" : "bg-warn")} />
           {live ? "Live stream" : "Polling"}
         </span>
       </div>
-      <div className="mt-3 flex flex-wrap items-end justify-between gap-x-10 gap-y-4">
+      <div className="mt-3 flex flex-wrap items-start justify-between gap-x-10 gap-y-4">
         <div className="min-w-0 max-w-4xl">
-          <div className="flex items-center gap-3">
+          <h1 className="text-2xl font-semibold leading-8 text-fg">{c.title}</h1>
+          <div className="mt-2 flex items-center gap-3">
             <CaseStatusChip status={c.status} />
             <SeverityBadge severity={c.severity} />
           </div>
-          <h1 className="mt-2.5 text-[30px] font-semibold leading-[36px] tracking-[-0.03em]">{c.title}</h1>
         </div>
         {c.links.length > 0 && (
           <div className="flex max-w-[640px] flex-wrap justify-end gap-1.5">
@@ -230,11 +226,11 @@ function CaseHeader({ c, live }: { c: Case; live: boolean }) {
           </div>
         )}
       </div>
-      <dl className="mt-5 grid grid-cols-2 border-y border-border md:grid-cols-3 xl:grid-cols-6">
+      <dl className="panel mt-5 grid grid-cols-2 md:grid-cols-4">
         {spec.map(([k, v], i) => (
-          <div key={k} className={cn("px-4 py-3", i > 0 && "xl:border-l xl:border-border", "first:pl-0")}>
+          <div key={k} className={cn("px-4 py-3", i > 0 && "md:border-l md:border-border")}>
             <dt className="label">{k}</dt>
-            <dd className="mt-1">{v}</dd>
+            <dd className="mt-1 text-sm">{v}</dd>
           </div>
         ))}
       </dl>
@@ -242,7 +238,7 @@ function CaseHeader({ c, live }: { c: Case; live: boolean }) {
   );
 }
 
-const LEVEL_CLS: Record<string, string> = { error: "text-bad", warn: "text-warn", tool: "text-[#9d8cff]", info: "text-faint" };
+const LEVEL_CLS: Record<string, string> = { error: "text-bad", warn: "text-warn", tool: "text-info", info: "text-faint" };
 
 function ActivityFeed({ runs, onSelect }: { runs: StageRun[]; onSelect: (k: string) => void }) {
   const { stages } = useApp();

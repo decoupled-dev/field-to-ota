@@ -53,9 +53,9 @@ export default function IntegrationsPage() {
   return (
     <PageBody>
       <PageHeader
-        eyebrow={ints.data ? <><span className="text-ok">{totals.connected} connected</span> · <span className="text-warn">{totals.simulated} simulated</span> · {totals.available} available</> : "Toolchain"}
         title="Integrations"
         description="Every stage calls a connector through a capability interface. Swap in the OEM toolchain without changing the pipeline."
+        actions={ints.data && <><Badge tone="ok">{totals.connected} connected</Badge><Badge tone="warn">{totals.simulated} simulated</Badge></>}
       />
       {ints.error && !ints.data ? (
         <ErrorState error={ints.error} onRetry={ints.reload} />
@@ -68,7 +68,7 @@ export default function IntegrationsPage() {
           {groups.map((g) => (
             <section key={g.capability} className="grid bg-surface lg:grid-cols-[240px_1fr]">
               <div className="border-b border-border px-4 py-4 lg:border-b-0 lg:border-r">
-                <div className="font-mono text-2xs font-medium uppercase tracking-[0.09em] text-fg">{g.title}</div>
+                <div className="text-sm font-semibold text-fg">{g.title}</div>
                 <div className="mt-1 text-xs leading-5 text-muted">{g.description}</div>
                 <div className="mt-2 font-mono text-[10px] text-faint">{g.capability}</div>
               </div>
@@ -84,7 +84,7 @@ export default function IntegrationsPage() {
                           <span className="truncate text-[13.5px] font-semibold">{i.name}</span>
                           <Badge tone={STATUS[i.status]?.tone ?? "outline"}>{STATUS[i.status]?.label ?? i.status}</Badge>
                         </div>
-                        <div className="font-mono text-2xs uppercase tracking-[0.05em] text-faint">{i.vendor}</div>
+                        <div className="text-xs text-faint">{i.vendor}</div>
                       </div>
                     </div>
                     <p className="mt-2.5 flex-1 text-xs leading-5 text-muted">{i.description}</p>
@@ -112,11 +112,11 @@ export default function IntegrationsPage() {
               {(cfg.config_keys?.length ? cfg.config_keys : [`${cfg.key.toUpperCase()}_URL`, `${cfg.key.toUpperCase()}_TOKEN`]).map((k) => (
                 <div key={k} className="flex items-center justify-between gap-3 px-3 py-2">
                   <dt className="font-mono text-[12px]">{k}</dt>
-                  <dd className={cn("font-mono text-2xs uppercase tracking-[0.06em]", cfg.status === "connected" ? "text-ok" : "text-faint")}>{cfg.status === "connected" ? "set" : "not set"}</dd>
+                  <dd className={cn("text-xs", cfg.status === "connected" ? "text-ok" : "text-faint")}>{cfg.status === "connected" ? "set" : "not set"}</dd>
                 </div>
               ))}
             </dl>
-            <div className="font-mono text-2xs uppercase tracking-[0.06em] text-faint">Capability · <span className="text-fg">{cfg.capability}</span></div>
+            <div className="text-xs text-faint">Capability · <span className="text-fg">{cfg.capability}</span></div>
             <div className="flex justify-end">
               <ModalClose asChild><Button size="sm" variant="secondary">Close</Button></ModalClose>
             </div>

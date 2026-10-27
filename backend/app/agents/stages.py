@@ -168,7 +168,7 @@ def ticket(ctx: StageContext) -> None:
     triage_run = next(r for r in store.list_stages(ctx.case.id) if r.stage == "triage")
     desc = "\n".join([triage_run.summary, "", "Field evidence:"] +
                      [f"- [{s.source.value}] {s.title} ({s.url or s.vin})" for s in sigs] +
-                     ["", f"Opened automatically by Field-to-Fix case {ctx.case.id}."])
+                     ["", f"Opened automatically by Loopback case {ctx.case.id}."])
     ctx.tool(f"{tracker.info.name}.create_issue(project={settings.jira_project}, type=Bug, priority={ctx.case.severity})")
     issue = tracker.create_issue(f"[Field] {ctx.case.title}", desc, ["field-to-fix", "media-service", "hu-2.3.1"], ctx.case.severity)
     ctx.shared["issue"] = issue.key
@@ -357,11 +357,11 @@ def fix(ctx: StageContext) -> None:
     diff = git(wt, "diff", "v2.3.1", "HEAD", "--", "media_service", "tests", "VERSION")
     ctx.artifact("Code change v2.3.1 → fix branch", "diff", content=diff)
     issue = store.get_doc("kv", f"case-issue:{ctx.case.id}") or {}
-    body = (f"## {ctx.case.title}\n\nFixes {issue.get('key', '')} · Field-to-Fix case `{ctx.case.id}`\n\n"
+    body = (f"## {ctx.case.title}\n\nFixes {issue.get('key', '')} · Loopback case `{ctx.case.id}`\n\n"
             f"**Root cause.** {rca_out.get('root_cause', '')}\n\n**Change.**\n- `REQ-MEDIA-021` rev B (stream only after HAL ready)\n"
             f"- `A2dpManager.cold_start`: gate on HAL onReady, 1500 ms bound, defer instead of force\n"
             f"- Regression tests `tests/test_cold_start_regression.py` (TC-MEDIA-021-02/03)\n\n"
-            f"**Fleet impact.** {ctx.case.affected_vins} vehicles on HU-2.3.1.\n\n_Opened by the Field-to-Fix Fix Agent; requires human approval before OTA._")
+            f"**Fleet impact.** {ctx.case.affected_vins} vehicles on HU-2.3.1.\n\n_Opened by the Loopback Fix Agent; requires human approval before OTA._")
     ctx.tool(f"{scm.info.name}.open_pull_request(branch={ctx.shared['branch']})")
     pr = scm.open_pull_request(str(wt), ctx.shared["branch"], f"fix(audio): A2DP cold-start underruns ({issue.get('key', ctx.case.id)})", body)
     ctx.shared["pr"] = pr.__dict__

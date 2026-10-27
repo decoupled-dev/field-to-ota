@@ -1,4 +1,4 @@
-"""Field-to-Fix console API.
+"""Loopback console API.
 
     uvicorn backend.app.main:app --port 8000      (from the repo root)
 """
@@ -48,12 +48,12 @@ async def lifespan(app: FastAPI):
             c.status = CaseStatus.failed
             store.put_case(c)
     threading.Thread(target=crawl_loop, args=(_stop,), daemon=True, name="crawlers").start()
-    log.info("Field-to-Fix console up: mode=%s llm=%s", settings.mode, llm.mode())
+    log.info("Loopback console up: mode=%s llm=%s", settings.mode, llm.mode())
     yield
     _stop.set()
 
 
-app = FastAPI(title="Field-to-Fix", version="0.1.0", lifespan=lifespan)
+app = FastAPI(title="Loopback", version="0.1.0", lifespan=lifespan)
 
 
 # System ------------------------------------------------------------------------------------------

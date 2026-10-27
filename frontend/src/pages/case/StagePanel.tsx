@@ -8,7 +8,7 @@ import { ArtifactView } from "./ArtifactView";
 
 const LEVEL: Record<string, { label: string; cls: string }> = {
   thought: { label: "think", cls: "text-info" },
-  tool: { label: "tool", cls: "text-[#9d8cff]" },
+  tool: { label: "tool", cls: "text-info" },
   info: { label: "info", cls: "text-faint" },
   warn: { label: "warn", cls: "text-warn" },
   error: { label: "error", cls: "text-bad" },
@@ -16,12 +16,12 @@ const LEVEL: Record<string, { label: string; cls: string }> = {
 
 function KV({ data }: { data: Record<string, unknown> }) {
   const entries = Object.entries(data ?? {});
-  if (!entries.length) return <div className="font-mono text-2xs uppercase tracking-wider text-faint">None</div>;
+  if (!entries.length) return <div className="text-xs text-faint">None</div>;
   return (
     <dl className="divide-y divide-border overflow-hidden rounded border border-border">
       {entries.map(([k, v]) => (
         <div key={k} className="grid grid-cols-[132px_1fr] gap-3 px-3 py-2">
-          <dt className="pt-px font-mono text-2xs uppercase tracking-[0.05em] text-faint">{humanize(k)}</dt>
+          <dt className="pt-px text-xs text-faint">{humanize(k)}</dt>
           <dd className="min-w-0 break-words text-[12.5px]">
             {Array.isArray(v) && v.every((x) => typeof x !== "object") ? (
               <ul className="space-y-1">
@@ -64,7 +64,7 @@ export function StageInspector({ def, run, index, total, onStep }: { def: StageD
           <h2 className="text-[19px] font-semibold leading-6 tracking-[-0.02em]">{def.name}</h2>
           <StageStatusChip status={status} />
         </div>
-        <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-2xs uppercase tracking-[0.05em] text-muted">
+        <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted">
           <span>{run?.agent || def.agent}</span>
           {run?.connector && <span className="text-faint">via <span className="text-fg">{run.connector}</span></span>}
           {run?.simulated && <span className="rounded-sm border border-dashed border-strong px-1 text-faint">simulated connector</span>}
@@ -157,7 +157,7 @@ export function StageInspector({ def, run, index, total, onStep }: { def: StageD
                         <span className="block truncate text-[13px] font-medium">{l.label}</span>
                         <span className="block truncate font-mono text-2xs text-faint">{l.url}</span>
                       </span>
-                      <span className="font-mono text-2xs uppercase tracking-[0.06em] text-muted">{l.tool}</span>
+                      <span className="text-xs text-muted">{l.tool}</span>
                       <ArrowUpRight size={13} className="text-faint group-hover:text-accent" />
                     </a>
                   </li>

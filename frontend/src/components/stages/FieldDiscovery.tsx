@@ -92,15 +92,15 @@ function MetricsStrip({ run }: { run: StageRun }) {
 function SourceCoverageTable({ rows }: { rows: SourceCoverageRow[] }) {
   return (
     <section>
-      <h4 className="text-xs uppercase tracking-wider text-muted mb-2">Sources searched</h4>
+      <h4 className="mb-2 text-sm font-semibold text-fg">Sources searched</h4>
       <div className="overflow-hidden rounded border border-border divide-y divide-border">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border bg-surface">
-              <th className="px-3 py-1.5 text-left font-mono text-2xs uppercase tracking-[0.06em] text-faint">Source</th>
-              <th className="px-3 py-1.5 text-left font-mono text-2xs uppercase tracking-[0.06em] text-faint">Category</th>
-              <th className="px-3 py-1.5 text-left font-mono text-2xs uppercase tracking-[0.06em] text-faint">Status</th>
-              <th className="px-3 py-1.5 text-right font-mono text-2xs uppercase tracking-[0.06em] text-faint">Issues</th>
+              <th className="px-3 py-1.5 text-left text-xs font-semibold text-faint">Source</th>
+              <th className="px-3 py-1.5 text-left text-xs font-semibold text-faint">Category</th>
+              <th className="px-3 py-1.5 text-left text-xs font-semibold text-faint">Status</th>
+              <th className="px-3 py-1.5 text-right text-xs font-semibold text-faint">Issues</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
@@ -136,17 +136,17 @@ function TopIssuesTable({ issues }: { issues: DiscoveredIssue[] }) {
 
   return (
     <section>
-      <h4 className="text-xs uppercase tracking-wider text-muted mb-2">Top issues by frequency</h4>
+      <h4 className="mb-2 text-sm font-semibold text-fg">Top issues by frequency</h4>
       <div className="overflow-hidden rounded border border-border divide-y divide-border">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border bg-surface">
-              <th className="w-6 px-3 py-1.5 text-left font-mono text-2xs uppercase tracking-[0.06em] text-faint">#</th>
-              <th className="px-3 py-1.5 text-left font-mono text-2xs uppercase tracking-[0.06em] text-faint">Title</th>
-              <th className="px-3 py-1.5 text-left font-mono text-2xs uppercase tracking-[0.06em] text-faint">Source</th>
-              <th className="px-3 py-1.5 text-left font-mono text-2xs uppercase tracking-[0.06em] text-faint">Severity</th>
-              <th className="px-3 py-1.5 text-right font-mono text-2xs uppercase tracking-[0.06em] text-faint">Count</th>
-              <th className="px-3 py-1.5 text-left font-mono text-2xs uppercase tracking-[0.06em] text-faint">Actionable</th>
+              <th className="w-6 px-3 py-1.5 text-left text-xs font-semibold text-faint">#</th>
+              <th className="px-3 py-1.5 text-left text-xs font-semibold text-faint">Title</th>
+              <th className="px-3 py-1.5 text-left text-xs font-semibold text-faint">Source</th>
+              <th className="px-3 py-1.5 text-left text-xs font-semibold text-faint">Severity</th>
+              <th className="px-3 py-1.5 text-right text-xs font-semibold text-faint">Count</th>
+              <th className="px-3 py-1.5 text-left text-xs font-semibold text-faint">Actionable</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
@@ -210,7 +210,7 @@ export function FieldDiscoveryStageView({ run }: { run: StageRun }) {
         <TopIssuesTable issues={discoveredIssues} />
       ) : (
         <section>
-          <h4 className="text-xs uppercase tracking-wider text-muted mb-2">Top issues by frequency</h4>
+          <h4 className="mb-2 text-sm font-semibold text-fg">Top issues by frequency</h4>
           <Empty title="No issues discovered yet" />
         </section>
       )}

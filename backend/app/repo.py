@@ -68,6 +68,6 @@ def checkout(case_id: str) -> Path:
         shutil.rmtree(wt)
     wt.parent.mkdir(parents=True, exist_ok=True)
     git(wt.parent, "clone", "-q", str(REMOTE), wt.name)
-    git(wt, "config", "user.name", "Field-to-Fix Agent")
+    git(wt, "config", "user.name", "Loopback Agent")
     git(wt, "config", "user.email", "agent@field-to-fix.example")
     return wt

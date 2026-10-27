@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowUpRight, ChevronRight, RotateCcw } from "lucide-react";
+import { ArrowUpRight, RotateCcw } from "lucide-react";
 import { api, type Overview } from "@/lib/api";
 import { useAsync, useEventStream } from "@/lib/hooks";
 import { useApp } from "@/lib/context";
@@ -9,7 +9,7 @@ import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Empty, ErrorState, Skeleton } from "@/components/ui/states";
 import { Table, Td, Th, Tr } from "@/components/ui/table";
-import { CaseStatusChip, SeverityBadge, SOURCE_META, SOURCES, StageStrip, inferStageStatuses } from "@/components/domain";
+import { CaseStatusChip, SOURCE_META, SOURCES, StageStrip, inferStageStatuses } from "@/components/domain";
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis, axis, grid, tooltipProps } from "@/components/charts";
 import { cn, timeAgo } from "@/lib/utils";
 
@@ -33,7 +33,6 @@ export default function OverviewPage() {
   return (
     <PageBody>
       <PageHeader
-        eyebrow="Operations · all programs"
         title="Overview"
         description="Field signals in, verified OTAs out. Every number below is traceable to a case and its evidence pack."
         actions={
@@ -63,7 +62,7 @@ export default function OverviewPage() {
         <CardHeader
           title="Cases"
           description="Pipelines started from clustered field signals"
-          action={<Link to="/cases" className="inline-flex items-center gap-1 font-mono text-2xs uppercase tracking-[0.06em] text-muted hover:text-accent">All cases <ArrowUpRight size={11} /></Link>}
+          action={<Link to="/cases" className="inline-flex items-center gap-1 text-xs text-muted hover:text-accent">All cases <ArrowUpRight size={11} /></Link>}
         />
         <CasesTable data={ov.data} loading={ov.loading && !ov.data} />
       </Card>
@@ -87,33 +86,23 @@ function Funnel({ data, loading }: { data?: Overview; loading: boolean }) {
   ];
   const mttr = k?.mttr_minutes;
   return (
-    <div className="panel grid overflow-hidden md:grid-cols-[repeat(4,minmax(0,1fr))_minmax(240px,0.9fr)]">
+    <div className="panel grid overflow-hidden md:grid-cols-5">
       {steps.map((s, i) => (
-        <div key={s.label} className={cn("relative px-5 py-5", i > 0 && "border-t border-border md:border-l md:border-t-0")}>
-          {i > 0 && (
-            <span className="absolute -left-[9px] top-1/2 z-10 hidden h-[18px] w-[18px] -translate-y-1/2 items-center justify-center rounded-full border border-border bg-surface text-faint md:flex">
-              <ChevronRight size={11} />
-            </span>
-          )}
-          <div className="label flex items-center gap-2">
-            <span className="text-faint">{String(i + 1).padStart(2, "0")}</span>
-            {s.label}
-          </div>
-          {loading ? <Skeleton className="mt-3 h-10 w-20" /> : <div className={cn("tnum mt-2 text-[42px] font-light leading-none tracking-[-0.045em]", s.tone)}>{s.value ?? "—"}</div>}
-          <div className="mt-2.5 font-mono text-2xs uppercase tracking-[0.05em] text-faint">{s.sub}</div>
+        <div key={s.label} className={cn("px-5 py-4", i > 0 && "border-t border-border md:border-l md:border-t-0")}>
+          <div className="label">{s.label}</div>
+          {loading ? <Skeleton className="mt-2 h-8 w-16" /> : <div className={cn("tnum mt-1 text-[28px] font-semibold leading-9", s.tone)}>{s.value ?? "—"}</div>}
         </div>
       ))}
-      <div className="relative border-t border-border bg-accent/[0.06] px-5 py-5 md:border-l md:border-t-0 md:border-l-accent/30">
-        <div className="label text-accent">MTTR · complaint → OTA</div>
+      <div className="border-t border-border px-5 py-4 md:border-l md:border-t-0" title="Median time from first complaint to OTA, over closed cases">
+        <div className="label">Time to fix (median)</div>
         {loading ? (
-          <Skeleton className="mt-3 h-10 w-24" />
+          <Skeleton className="mt-2 h-8 w-20" />
         ) : (
-          <div className="tnum mt-2 text-[42px] font-light leading-none tracking-[-0.045em]">
+          <div className="tnum mt-1 text-[28px] font-semibold leading-9">
             {mttr != null ? mttr.toFixed(mttr < 10 ? 1 : 0) : "—"}
-            <span className="ml-1 text-[18px] font-normal tracking-normal text-muted">min</span>
+            <span className="ml-1 text-sm font-normal text-faint">min</span>
           </div>
         )}
-        <div className="mt-2.5 font-mono text-2xs uppercase tracking-[0.05em] text-faint">median over closed cases</div>
       </div>
     </div>
   );
@@ -127,7 +116,7 @@ function Timeline({ data }: { data: Overview }) {
     <>
       <div className="mb-3 flex flex-wrap gap-x-4 gap-y-1">
         {active.map((s) => (
-          <span key={s} className="inline-flex items-center gap-1.5 font-mono text-2xs uppercase tracking-[0.05em] text-muted">
+          <span key={s} className="inline-flex items-center gap-1.5 text-xs text-muted">
             <span className="h-2 w-2 rounded-[1px]" style={{ background: SOURCE_META[s].color }} />
             {SOURCE_META[s].label}
           </span>
@@ -190,10 +179,8 @@ function CasesTable({ data, loading }: { data?: Overview; loading: boolean }) {
           <Th>Case</Th>
           <Th>Title</Th>
           <Th>Status</Th>
-          <Th>Severity</Th>
           <Th>Pipeline</Th>
-          <Th className="text-right">Affected</Th>
-          <Th className="text-right">Fixed</Th>
+          <Th className="text-right">Fixed / affected</Th>
           <Th className="text-right">Updated</Th>
         </tr>
       </thead>
@@ -207,11 +194,9 @@ function CasesTable({ data, loading }: { data?: Overview; loading: boolean }) {
               <Link to={`/cases/${c.id}`} className="hover:text-accent">{c.title}</Link>
             </Td>
             <Td><CaseStatusChip status={c.status} /></Td>
-            <Td><SeverityBadge severity={c.severity} /></Td>
             <Td><StageStrip stages={stages} runs={inferStageStatuses(stages, c.current_stage, c.status)} /></Td>
-            <Td className="tnum text-right font-mono text-[12.5px]">{c.affected_vins}</Td>
-            <Td className={cn("tnum text-right font-mono text-[12.5px]", c.fixed_vins ? "text-ok" : "text-faint")}>{c.fixed_vins}</Td>
-            <Td className="tnum whitespace-nowrap text-right font-mono text-2xs text-faint">{timeAgo(c.updated_at)}</Td>
+            <Td className="tnum text-right"><span className={c.fixed_vins ? "text-ok" : "text-faint"}>{c.fixed_vins}</span><span className="text-faint"> / {c.affected_vins}</span></Td>
+            <Td className="tnum whitespace-nowrap text-right text-xs text-faint">{timeAgo(c.updated_at)}</Td>
           </Tr>
         ))}
       </tbody>

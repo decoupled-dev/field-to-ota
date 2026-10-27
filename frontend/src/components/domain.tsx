@@ -112,7 +112,7 @@ export function SeverityBadge({ severity }: { severity: string | null | undefine
   const lvl = SEVERITY_LEVEL[severity] ?? 1;
   const color = lvl >= 3 ? "bg-bad" : lvl === 2 ? "bg-warn" : "bg-muted";
   return (
-    <span className="inline-flex items-center gap-2 font-mono text-2xs uppercase tracking-[0.06em]">
+    <span className="inline-flex items-center gap-2 text-xs">
       <span className="flex items-end gap-[2px]">
         {[1, 2, 3, 4].map((i) => (
           <span key={i} className={cn("w-[3px] rounded-[1px]", i <= lvl ? color : "bg-border")} style={{ height: 4 + i * 2 }} />
@@ -124,12 +124,12 @@ export function SeverityBadge({ severity }: { severity: string | null | undefine
 }
 
 export const SOURCE_META: Record<SignalSource, { label: string; icon: typeof Globe; color: string }> = {
-  reddit: { label: "Reddit", icon: MessageSquare, color: "#ff8a5b" },
-  forum: { label: "Owners forum", icon: Globe, color: "#4cc9f0" },
-  x: { label: "X", icon: Hash, color: "#a3abb8" },
-  issuetracker: { label: "Issue Tracker", icon: Ticket, color: "#9d8cff" },
-  partner_jira: { label: "Partner Jira", icon: Ticket, color: "#2dd4bf" },
-  device: { label: "hu-sentinel", icon: Cpu, color: "#f7c948" },
+  reddit: { label: "Reddit", icon: MessageSquare, color: "#E56910" },
+  forum: { label: "Owners forum", icon: Globe, color: "#2898BD" },
+  x: { label: "X", icon: Hash, color: "#758195" },
+  issuetracker: { label: "Issue Tracker", icon: Ticket, color: "#8270DB" },
+  partner_jira: { label: "Partner Jira", icon: Ticket, color: "#1D7AFC" },
+  device: { label: "hu-sentinel", icon: Cpu, color: "#B38600" },
 };
 
 export const SOURCES = Object.keys(SOURCE_META) as SignalSource[];
@@ -138,7 +138,7 @@ export function SourceBadge({ source }: { source: SignalSource }) {
   const m = SOURCE_META[source] ?? { label: source, icon: Radio, color: "#888" };
   const Icon = m.icon;
   return (
-    <span className="inline-flex h-5 items-center gap-1.5 whitespace-nowrap font-mono text-2xs uppercase tracking-[0.05em] text-fg">
+    <span className="inline-flex h-5 items-center gap-1.5 whitespace-nowrap text-xs text-fg">
       <span className="flex h-5 w-5 items-center justify-center rounded-sm" style={{ background: `${m.color}1f`, color: m.color }}>
         <Icon size={11} strokeWidth={2} />
       </span>
@@ -186,7 +186,7 @@ export function LinkChip({ link }: { link: Link }) {
       className="group inline-flex h-7 items-center gap-2 rounded border border-border bg-surface pl-2 pr-2.5 text-xs font-medium transition-colors hover:border-accent/50"
     >
       <ToolIcon tool={link.tool} size={13} className="group-hover:text-accent" />
-      <span className="font-mono text-2xs uppercase tracking-[0.06em] text-faint">{link.tool}</span>
+      <span className="text-xs text-faint">{link.tool}</span>
       <span className="max-w-[260px] truncate">{link.label}</span>
     </a>
   );

@@ -55,7 +55,7 @@ export function ApprovalBanner({ caseId, run, onDone }: { caseId: string; run: S
             <dl className="mt-3 flex flex-wrap gap-x-6 gap-y-1.5">
               {evidence.map(([k, v]) => (
                 <div key={k} className="flex items-baseline gap-2">
-                  <dt className="font-mono text-2xs uppercase tracking-[0.06em] text-faint">{k.replace(/_/g, " ")}</dt>
+                  <dt className="text-xs text-faint">{k.replace(/_/g, " ")}</dt>
                   <dd className="tnum font-mono text-[12px] text-fg">{typeof v === "object" ? JSON.stringify(v) : String(v)}</dd>
                 </div>
               ))}

@@ -61,7 +61,7 @@ export function TimelineView({ stages, runs, selected, onSelect }: { stages: Sta
           );
         })}
       </ul>
-      <div className="mt-4 flex flex-wrap gap-x-8 gap-y-1 border-t border-border px-3 pt-3 font-mono text-2xs uppercase tracking-[0.06em] text-muted">
+      <div className="mt-4 flex flex-wrap gap-x-8 gap-y-1 border-t border-border px-3 pt-3 text-xs text-muted">
         <span>Agent time <span className="tnum ml-1 text-fg">{fmtDuration(now - agentTotal, now) || "0s"}</span></span>
         <span>Human gate <span className="tnum ml-1 text-warn">{gateTotal ? fmtDuration(now - gateTotal, now) : "—"}</span></span>
         {isFinite(t0) && <span>Started <span className="tnum ml-1 text-fg">{fmtClock(t0)}</span></span>}
