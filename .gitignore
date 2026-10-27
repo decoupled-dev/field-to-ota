@@ -9,3 +9,6 @@ frontend/dist/
 hu-sentinel/bin/
 .env
 infra/cdk.out/
+
+# EC2 SSH private key — never commit
+infra/*.pem

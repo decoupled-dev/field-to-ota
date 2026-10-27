@@ -12,6 +12,7 @@ aws ec2 run-instances \
   --instance-type t3.small \
   --subnet-id "$SUBNET" \
   --security-group-ids "$SG" \
+  --key-name field-to-fix-key \
   --associate-public-ip-address \
   --block-device-mappings 'DeviceName=/dev/xvda,Ebs={VolumeSize=20,VolumeType=gp3,DeleteOnTermination=true}' \
   --user-data "file://$UD" \

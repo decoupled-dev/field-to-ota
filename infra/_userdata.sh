@@ -9,7 +9,7 @@ systemctl enable --now docker
 
 cd /opt
 rm -rf field-to-ota
-git clone --depth 1 --branch feat/field-discovery https://github.com/decoupled-dev/field-to-ota.git
+git clone --depth 1 --branch master https://github.com/decoupled-dev/field-to-ota.git
 cd field-to-ota
 
 # Build the console image (React build + FastAPI) using the repo Dockerfile.
