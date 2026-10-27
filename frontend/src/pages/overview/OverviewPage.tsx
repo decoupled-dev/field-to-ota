@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowUpRight, RotateCcw } from "lucide-react";
+import { ArrowUpRight, ChartColumn, FolderKanban, ChartPie, RotateCcw } from "lucide-react";
 import { api, type Overview } from "@/lib/api";
 import { useAsync, useEventStream } from "@/lib/hooks";
 import { useApp } from "@/lib/context";
@@ -50,16 +50,17 @@ export default function OverviewPage() {
       <Funnel data={ov.data} loading={ov.loading && !ov.data} />
       <div className="mt-5 grid gap-5 lg:grid-cols-3">
         <Card className="lg:col-span-2">
-          <CardHeader title="Signal volume" description="Normalized signals per source over time" />
+          <CardHeader icon={ChartColumn} title="Signal volume" description="Normalized signals per source over time" />
           <CardBody>{ov.data ? <Timeline data={ov.data} /> : ov.error ? <Empty title="No data" className="h-[240px]" /> : <Skeleton className="h-[240px]" />}</CardBody>
         </Card>
         <Card>
-          <CardHeader title="Intake channels" description="Share of all signals" />
+          <CardHeader icon={ChartPie} title="Intake channels" description="Share of all signals" />
           <CardBody>{ov.data ? <SourceBreakdown data={ov.data} /> : ov.error ? <Empty title="No data" className="h-[240px]" /> : <Skeleton className="h-[240px]" />}</CardBody>
         </Card>
       </div>
       <Card className="mt-5">
         <CardHeader
+          icon={FolderKanban}
           title="Cases"
           description="Pipelines started from clustered field signals"
           action={<Link to="/cases" className="inline-flex items-center gap-1 text-xs text-muted hover:text-accent">All cases <ArrowUpRight size={11} /></Link>}

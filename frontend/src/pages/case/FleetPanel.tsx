@@ -1,3 +1,4 @@
+import { HeartPulse, Rocket, Car, ChartBar } from "lucide-react";
 import { api, type Fleet } from "@/lib/api";
 import { useAsync } from "@/lib/hooks";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
@@ -25,7 +26,7 @@ export function FleetPanel({ caseId, refreshKey }: { caseId: string; refreshKey:
         <Breakdown title="By min. ambient" data={f.by_temp.map((r) => ({ name: r.bucket, affected: r.affected, total: r.total }))} />
       </div>
       <Card>
-        <CardHeader title="Field health" description="Audio underruns per ignition across the cohort, before and after the OTA" />
+        <CardHeader icon={HeartPulse} title="Field health" description="Audio underruns per ignition across the cohort, before and after the OTA" />
         <CardBody>
           {f.health.length ? (
             <ResponsiveContainer width="100%" height={220}>
@@ -49,7 +50,7 @@ export function FleetPanel({ caseId, refreshKey }: { caseId: string; refreshKey:
         </CardBody>
       </Card>
       <Card>
-        <CardHeader title="Affected cohort" description={`${f.affected_vins} of ${f.total_vins} vehicles match the signature`} />
+        <CardHeader icon={Car} title="Affected cohort" description={`${f.affected_vins} of ${f.total_vins} vehicles match the signature`} />
         <div className="max-h-[420px] overflow-y-auto">
           <Table>
             <thead className="sticky top-0 z-10">
@@ -106,7 +107,7 @@ function Rollout({ f }: { f: Fleet }) {
   ];
   return (
     <Card>
-      <CardHeader title="OTA rollout" description={r.targeted ? `Wave: ${r.wave}` : "Not started. Rollout begins after release approval."} />
+      <CardHeader icon={Rocket} title="OTA rollout" description={r.targeted ? `Wave: ${r.wave}` : "Not started. Rollout begins after release approval."} />
       <div className="grid gap-6 p-4 lg:grid-cols-[220px_1fr]">
         <div>
           <div className="label">Fleet repaired</div>
@@ -141,7 +142,7 @@ function Rollout({ f }: { f: Fleet }) {
 function Breakdown({ title, data }: { title: string; data: { name: string; affected: number; total: number }[] }) {
   return (
     <Card>
-      <CardHeader title={title} />
+      <CardHeader icon={ChartBar} title={title} />
       <CardBody>
         {data.length ? (
           <ResponsiveContainer width="100%" height={200}>

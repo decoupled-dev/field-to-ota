@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
-import { ArrowRight } from "lucide-react";
+import { Activity, ArrowRight, ChartGantt, GitMerge } from "lucide-react";
 import { api, type Case, type CaseDetail, type F2FEvent, type LogLine, type StageRun } from "@/lib/api";
 import { useAsync, useEventStream } from "@/lib/hooks";
 import { useApp } from "@/lib/context";
@@ -96,6 +96,7 @@ export default function CaseDetailPage() {
       <div className="mt-5 grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_440px]">
         <Card className="ticks overflow-hidden">
           <CardHeader
+            icon={view === "v" ? GitMerge : ChartGantt}
             title={view === "v" ? "V-model" : "Timeline"}
             description={view === "v" ? "Field → diagnose down the right side → fix on the left → verify back up to the vehicle" : "Time spent per stage; the human gate is shown hatched"}
             action={
@@ -250,7 +251,7 @@ function ActivityFeed({ runs, onSelect }: { runs: StageRun[]; onSelect: (k: stri
     .slice(0, 18);
   return (
     <Card>
-      <CardHeader title="Activity" description="Most recent agent and tool actions across stages" />
+      <CardHeader icon={Activity} title="Activity" description="Most recent agent and tool actions across stages" />
       {lines.length ? (
         <ul className="py-1.5 font-mono text-[12px] leading-5">
           {lines.map((l, i) => (

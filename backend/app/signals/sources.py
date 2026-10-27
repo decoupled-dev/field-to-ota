@@ -7,8 +7,6 @@ from __future__ import annotations
 
 import json
 import logging
-import time
-
 import httpx
 
 from ..config import ROOT, settings
@@ -70,17 +68,38 @@ def poll_reddit() -> list[Signal]:
     return out
 
 
+def poll_simulated(source: str) -> list[Signal]:
+    """Simulated feeds replay the fixture file; anything already ingested is skipped, so steady state finds nothing."""
+    seen = {(s.source.value, s.external_id) for s in store.list_signals()}
+    return [s for s in fixture_signals() if s.source.value == source and (source, s.external_id) not in seen]
+
+
+def _forum_posts() -> str:
+    n = len(store.list_docs("kv", "forum:"))
+    return f"{n} posts scanned"
+
+
+POLLS = {
+    "forum": (poll_forum, _forum_posts),
+    "reddit": ((poll_reddit, None) if settings.reddit_live else (lambda: poll_simulated("reddit"), None)),
+    "x": (lambda: poll_simulated("x"), None),
+    "issuetracker": (lambda: poll_simulated("issuetracker"), None),
+    "partner_jira": (lambda: poll_simulated("partner_jira"), None),
+}
+
+
 def crawl_loop(stop) -> None:
+    from . import intake
     from .ingest import ingest
-    last_reddit = 0.0
     while not stop.is_set():
-        try:
-            for s in poll_forum():
-                ingest(s)
-            if time.time() - last_reddit > 300:
-                last_reddit = time.time()
-                for s in poll_reddit():
+        for key, (poll, scanned) in POLLS.items():
+            if stop.is_set():
+                break
+            if not intake.due(key):
+                continue
+            try:
+                for s in intake.check(key, poll, scanned):
                     ingest(s)
-        except Exception:
-            log.exception("crawl loop error")
-        stop.wait(3)
+            except Exception:
+                log.exception("crawl loop error (%s)", key)
+        stop.wait(1)

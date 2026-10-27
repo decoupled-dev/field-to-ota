@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { ArrowUpRight, Search } from "lucide-react";
+import { ArrowUpRight, Clock, FolderOpen, Layers, ListChecks, Package, Search, Tag, Users, X } from "lucide-react";
 import { api, type Cluster, type Signal } from "@/lib/api";
 import { useAsync, useEventStream } from "@/lib/hooks";
 import { PageBody, PageHeader } from "@/components/layout/Page";
@@ -10,22 +10,28 @@ import { Input } from "@/components/ui/field";
 import { Sheet } from "@/components/ui/sheet";
 import { Empty, ErrorState, Skeleton } from "@/components/ui/states";
 import { Table, Td, Th, Tr } from "@/components/ui/table";
-import { SeverityBadge, SOURCE_META, SOURCES, SourceBadge } from "@/components/domain";
+import { SeverityBadge, SOURCE_META, SourceBadge } from "@/components/domain";
+import { AgentFeed, SourceBoard, useIntake } from "./IntakeBoard";
 import { cn, fmtTime, humanize, timeAgo } from "@/lib/utils";
 
 export default function SignalsPage() {
   const signals = useAsync(() => api.signals(), [], 15000);
   const clusters = useAsync(api.clusters, [], 15000);
+  const intake = useIntake();
   const [source, setSource] = useState("");
   const [q, setQ] = useState("");
   const [open, setOpen] = useState<Signal | null>(null);
+  const [arrived, setArrived] = useState<Set<string>>(new Set());
 
-  useEventStream("/api/events", (e) => {
+  const live = useEventStream("/api/events", (e) => {
+    intake.onEvent(e);
     if (e.type === "signal.created" && e.data.signal) {
       const s = e.data.signal as Signal;
       signals.setData((prev) => (prev ? [s, ...prev.filter((p) => p.id !== s.id)] : [s]));
+      setArrived((a) => new Set(a).add(s.id));
     }
     if (e.type === "cluster.updated" || e.type === "case.created") clusters.reload();
+    if (e.type === "demo.reset") signals.reload();
   });
 
   const rows = useMemo(() => {
@@ -35,32 +41,32 @@ export default function SignalsPage() {
     );
   }, [signals.data, source, q]);
 
-  const counts = useMemo(() => {
-    const m: Record<string, number> = {};
-    (signals.data ?? []).forEach((s) => (m[s.source] = (m[s.source] ?? 0) + 1));
-    return m;
-  }, [signals.data]);
-
   return (
     <PageBody>
       <PageHeader
         title="Signals"
-        description="Every observation from social channels, public trackers and in-vehicle hu-sentinel daemons, normalized and triaged into one schema."
+        description="Every intake channel the agent watches, what it is checking right now, and every report it has normalized and triaged."
       />
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
+      <SourceBoard sources={intake.data?.sources} checkingUntil={intake.checkingUntil} selected={source} onSelect={setSource} />
+      <div className="mt-5 grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_400px]">
         <Card className="h-fit min-w-0">
           <div className="flex flex-wrap items-center gap-3 border-b border-border px-4 py-3">
-            <div className="relative w-72">
+            <h3 className="flex items-center gap-2 text-[15px] font-semibold">
+              <span className="flex h-6 w-6 items-center justify-center rounded bg-accent/10 text-accent"><ListChecks size={14} strokeWidth={2.25} /></span>
+              Reports
+            </h3>
+            {source && (
+              <button onClick={() => setSource("")} className="inline-flex h-6 items-center gap-1.5 rounded-full bg-accent/10 pl-2 pr-1.5 text-xs font-medium text-accent hover:bg-accent/15">
+                <span className="h-1.5 w-1.5 rounded-full" style={{ background: SOURCE_META[source as keyof typeof SOURCE_META]?.color }} />
+                {SOURCE_META[source as keyof typeof SOURCE_META]?.label ?? source}
+                <X size={12} />
+              </button>
+            )}
+            <span className="tnum text-xs text-faint">{rows.length} shown</span>
+            <div className="relative ml-auto w-64">
               <Search size={13} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-faint" />
               <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search title, body, component, VIN" className="pl-8" />
             </div>
-            <div className="flex flex-wrap items-center gap-1">
-              <SourceFilter active={!source} onClick={() => setSource("")} label="All" n={signals.data?.length ?? 0} />
-              {SOURCES.filter((s) => counts[s]).map((s) => (
-                <SourceFilter key={s} active={source === s} onClick={() => setSource(s)} label={SOURCE_META[s].label} n={counts[s]} color={SOURCE_META[s].color} />
-              ))}
-            </div>
-            <span className="tnum ml-auto text-xs text-faint">{rows.length} shown</span>
           </div>
           {signals.error && !signals.data ? (
             <div className="p-4"><ErrorState error={signals.error} onRetry={signals.reload} /></div>
@@ -81,7 +87,7 @@ export default function SignalsPage() {
               </thead>
               <tbody>
                 {rows.map((s) => (
-                  <Tr key={s.id} className="cursor-pointer" onClick={() => setOpen(s)}>
+                  <Tr key={s.id} className={cn("cursor-pointer", arrived.has(s.id) && "animate-flash")} onClick={() => setOpen(s)}>
                     <Td><SourceBadge source={s.source} /></Td>
                     <Td className="w-full max-w-0">
                       <div className="truncate text-[13px] font-medium">{s.title}</div>
@@ -89,7 +95,7 @@ export default function SignalsPage() {
                     <Td><SeverityBadge severity={s.severity} /></Td>
                     <Td className="whitespace-nowrap font-mono text-[12px]">
                       {s.case_id ? (
-                        <Link to={`/cases/${s.case_id}`} onClick={(e) => e.stopPropagation()} className="text-accent hover:underline">{s.case_id}</Link>
+                        <Link to={`/cases/${s.case_id}`} onClick={(e) => e.stopPropagation()} className="inline-flex items-center gap-1 text-accent hover:underline"><FolderOpen size={12} />{s.case_id}</Link>
                       ) : <span className="text-faint">—</span>}
                     </Td>
                     <Td className="tnum whitespace-nowrap text-right text-xs text-faint">{timeAgo(s.created_at)}</Td>
@@ -99,26 +105,13 @@ export default function SignalsPage() {
             </Table>
           )}
         </Card>
-        <ClustersPanel clusters={clusters.data} loading={clusters.loading && !clusters.data} error={clusters.error} onChange={clusters.reload} />
+        <div className="space-y-5">
+          <AgentFeed intake={intake.data} checkingUntil={intake.checkingUntil} live={live} />
+          <ClustersPanel clusters={clusters.data} loading={clusters.loading && !clusters.data} error={clusters.error} onChange={clusters.reload} />
+        </div>
       </div>
       <SignalSheet signal={open} onClose={() => setOpen(null)} />
     </PageBody>
-  );
-}
-
-function SourceFilter({ active, onClick, label, n, color }: { active: boolean; onClick: () => void; label: string; n: number; color?: string }) {
-  return (
-    <button
-      onClick={onClick}
-      className={cn(
-        "inline-flex h-7 items-center gap-1.5 rounded border px-2 text-xs transition-colors",
-        active ? "border-strong bg-raised text-fg" : "border-transparent text-muted hover:text-fg",
-      )}
-    >
-      {color && <span className="h-1.5 w-1.5 rounded-[1px]" style={{ background: color }} />}
-      {label}
-      <span className="tnum text-faint">{n}</span>
-    </button>
   );
 }
 
@@ -155,8 +148,7 @@ function ClustersPanel({ clusters, loading, error, onChange }: { clusters?: Clus
   };
   return (
     <Card className="h-fit">
-      <CardHeader title="Clusters" />
-      <p className="border-b border-border px-4 py-2.5 text-xs leading-5 text-muted">Semantically similar signals. A cluster opens a case on its own once it crosses the reporter threshold.</p>
+      <CardHeader icon={Layers} title="Clusters" description="Semantically similar signals. A cluster opens a case on its own once it crosses the reporter threshold." />
       {error && !clusters ? (
         <div className="p-4"><ErrorState error={error} onRetry={onChange} /></div>
       ) : loading ? (
@@ -166,18 +158,23 @@ function ClustersPanel({ clusters, loading, error, onChange }: { clusters?: Clus
       ) : (
         <ul className="divide-y divide-border">
           {clusters.map((c) => {
-            const crossed = c.score >= c.threshold;
+            // Cases trigger on independent reporters (backend cluster.should_trigger), not on similarity score.
+            const crossed = !!c.case_id || c.authors >= c.threshold;
             return (
               <li key={c.id} className="px-4 py-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <div className="text-[13px] font-medium leading-5">{c.title}</div>
-                    <div className="mt-1 text-xs text-faint">
-                      {[c.component, c.sw_version].filter(Boolean).join(" · ") || "Unclassified"} · {c.authors} authors · {timeAgo(c.last_seen)}
+                    <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-faint">
+                      <span className="inline-flex items-center gap-1"><Tag size={11} />{c.component ?? "Unclassified"}</span>
+                      {c.sw_version && <span className="inline-flex items-center gap-1 font-mono"><Package size={11} />{c.sw_version}</span>}
+                      <span className="inline-flex items-center gap-1"><Users size={11} />{c.authors}</span>
+                      <span className="inline-flex items-center gap-1"><Clock size={11} />{timeAgo(c.last_seen)}</span>
                     </div>
                   </div>
                   {c.case_id ? (
                     <Link to={`/cases/${c.case_id}`} className="inline-flex shrink-0 items-center gap-1 font-mono text-[12px] text-accent hover:underline">
+                      <FolderOpen size={12} />
                       {c.case_id}
                       <ArrowUpRight size={11} />
                     </Link>
@@ -186,9 +183,9 @@ function ClustersPanel({ clusters, loading, error, onChange }: { clusters?: Clus
                   )}
                 </div>
                 <div className="mt-3 flex items-center gap-3">
-                  <ThresholdGauge score={c.score} threshold={c.threshold} crossed={crossed} />
+                  <ThresholdGauge score={c.authors} threshold={c.threshold} crossed={crossed} />
                   <span className={cn("tnum shrink-0 font-mono text-[12px]", crossed ? "text-ok" : "text-fg")}>
-                    {c.score.toFixed(c.score % 1 ? 1 : 0)}<span className="text-faint">/{c.threshold}</span>
+                    {c.authors}<span className="text-faint">/{c.threshold} reporters</span>
                   </span>
                 </div>
                 <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1">

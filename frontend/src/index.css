@@ -102,5 +102,5 @@ body {
 @keyframes pulseRing { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
 
 @media (prefers-reduced-motion: reduce) {
-  .svg-spin, .svg-flow, .svg-pulse, .animate-pulseSoft, .animate-sweep, .animate-spinSlow { animation: none !important; }
+  .svg-spin, .svg-flow, .svg-pulse, .animate-pulseSoft, .animate-sweep, .animate-spinSlow, .animate-enter, .animate-flash { animation: none !important; }
 }

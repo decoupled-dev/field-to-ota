@@ -29,6 +29,7 @@ from .pipeline import runner
 from .reports.render import REPORTS, _env, render
 from .signals import cluster as clustering
 from .signals.ingest import ingest, open_case
+from .signals import intake
 from .signals.sources import crawl_loop
 from .stages import STAGES
 from .store import store
@@ -75,6 +76,7 @@ def integrations():
 @app.post("/api/demo/reset")
 def demo_reset():
     seed.reset()
+    intake.reset()
     bus.publish("demo.reset")
     return {"ok": True}
 
@@ -123,6 +125,18 @@ def list_signals(source: str | None = None, case_id: str | None = None):
 @app.post("/api/signals")
 def post_signal(body: SignalIn):
     return ingest(Signal(**body.model_dump()))
+
+
+@app.get("/api/intake")
+def intake_state():
+    """Per-source crawler state and the intake agent's recent activity, newest first."""
+    snap = intake.snapshot()
+    sigs = store.list_signals()
+    t_now = now()
+    for s in snap["sources"]:
+        mine = [x.created_at for x in sigs if x.source.value == s["source"]]
+        s.update(total=len(mine), last_24h=sum(t_now - t < 86400 for t in mine), last_signal_at=max(mine, default=None))
+    return snap
 
 
 @app.get("/api/clusters")

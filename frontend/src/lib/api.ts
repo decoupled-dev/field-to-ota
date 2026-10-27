@@ -122,6 +122,41 @@ export interface Overview {
   cases: Case[];
 }
 
+export interface IntakeSource {
+  source: SignalSource;
+  label: string;
+  kind: "poll" | "push";
+  mode: "live" | "simulated" | "push";
+  target: string;
+  interval: number | null;
+  status: "idle" | "checking" | "listening" | "error";
+  last_checked: number | null;
+  next_check: number | null;
+  last_found: number;
+  checks: number;
+  error: string | null;
+  total?: number;
+  last_24h?: number;
+  last_signal_at?: number | null;
+}
+
+export interface IntakeActivity {
+  id: number;
+  ts: number;
+  source: SignalSource | null;
+  kind: "check" | "found" | "triage" | "cluster" | "case" | "skip" | "error";
+  text: string;
+  count: number;
+  signal_id?: string;
+  cluster_id?: string;
+  case_id?: string;
+}
+
+export interface Intake {
+  sources: IntakeSource[];
+  activity: IntakeActivity[];
+}
+
 export interface Cluster {
   id: string;
   title: string;
@@ -214,6 +249,7 @@ export const api = {
     const p = new URLSearchParams(Object.entries(q).filter(([, v]) => v) as [string, string][]);
     return req<Signal[]>(`/signals${p.size ? `?${p}` : ""}`);
   },
+  intake: () => req<Intake>("/intake"),
   clusters: () => req<Cluster[]>("/clusters"),
   promote: (id: string) => req<Case>(`/clusters/${encodeURIComponent(id)}/promote`, { method: "POST" }),
   cases: () => req<Case[]>("/cases"),
