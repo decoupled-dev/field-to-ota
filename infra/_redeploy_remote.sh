@@ -10,9 +10,13 @@ docker rm -f f2f-console 2>/dev/null || true
 docker run -d --name f2f-console --restart unless-stopped \
   -p 8000:8000 \
   -e AWS_REGION=us-east-1 \
+  -e F2F_MODE=aws \
   -e DISCOVERY_AUTOSTART=1 \
   -e DISCOVERY_OEM=Stellantis \
   -e DISCOVERY_MODELS="Jeep,Dodge,RAM,Chrysler,Uconnect" \
   -e DISCOVERY_INTERVAL=900 \
+  -e DISCOVERY_AGENTCORE_ARN="arn:aws:bedrock-agentcore:us-east-1:788953906715:harness/field_discovery_agent-khxNQ0iKW2" \
+  -e RCA_AGENTCORE_ARN="arn:aws:bedrock-agentcore:us-east-1:788953906715:harness/harness_rca-I8ulwPsauK" \
+  -e BEDROCK_MODEL_ID="us.amazon.nova-lite-v1:0" \
   field-to-fix-console:latest
 echo "RUN_OK"

@@ -129,7 +129,21 @@ RCA_SYS = (
 
 
 def analyze(ev: LogEvidence) -> dict:
-    """Produce a structured RCA from log evidence. Bedrock when available, else deterministic."""
+    """Produce a structured RCA from log evidence.
+
+    Preference order: (1) a dedicated Bedrock AgentCore RCA harness (RCA_AGENTCORE_ARN),
+    (2) direct Bedrock model inference (Nova/Claude), (3) deterministic offline analyzer.
+    """
+    import os
+    from . import agentcore
+
+    arn = os.environ.get("RCA_AGENTCORE_ARN")
+    if agentcore.available(arn):
+        out = _analyze_agentcore(ev, arn)
+        if out:
+            out["engine"] = "Amazon Bedrock AgentCore · RCA harness"
+            return out
+
     if llm.available():
         out = _analyze_bedrock(ev)
         if out:
@@ -138,6 +152,43 @@ def analyze(ev: LogEvidence) -> dict:
     out = _analyze_offline(ev)
     out["engine"] = "offline log analyzer (no Bedrock credentials)"
     return out
+
+
+def _analyze_agentcore(ev: LogEvidence, arn: str) -> dict | None:
+    """Invoke the AgentCore RCA harness with the log evidence and parse its JSON verdict."""
+    import json
+    import re
+    from . import agentcore
+
+    prompt = (
+        f"{RCA_SYS}\n\n"
+        f"Log sources: {', '.join(ev.sources) or 'none'}\n"
+        f"Symptoms: {', '.join(ev.symptoms) or 'none'}\n"
+        f"Ambient: {ev.ambient_c}\n"
+        f"Top tags: {', '.join(f'{t}×{n}' for t, n in ev.top_tags)}\n\n"
+        f"ERROR/FATAL lines:\n" + "\n".join(ev.error_lines[:30]) + "\n\n"
+        f"WARNING lines:\n" + "\n".join(ev.warn_lines[:30]) + "\n\n"
+        f"Raw log excerpt:\n{ev.raw[:6000]}"
+    )
+    try:
+        text = agentcore.invoke(arn, prompt, tag="rca")
+    except Exception as e:  # noqa: BLE001
+        log.warning("AgentCore RCA harness invoke failed: %s", e)
+        return None
+    m = re.search(r"\{.*\}", text, re.S)
+    if not m:
+        return None
+    try:
+        data = json.loads(m.group(0))
+    except json.JSONDecodeError:
+        return None
+    data.setdefault("root_cause", text[:400])
+    data.setdefault("mechanism", [])
+    data.setdefault("suspected_component", _guess_component(ev))
+    data.setdefault("confidence", 0.7)
+    data.setdefault("evidence", ev.error_lines[:5])
+    data.setdefault("recommended_next_step", "")
+    return data
 
 
 def _analyze_bedrock(ev: LogEvidence) -> dict | None:

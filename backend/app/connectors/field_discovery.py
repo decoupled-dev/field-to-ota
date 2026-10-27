@@ -19,7 +19,6 @@ class AgentCoreFieldDiscovery:
     """
 
     def __init__(self):
-        import boto3
         self.arn = os.environ["DISCOVERY_AGENTCORE_ARN"]
         self.info = ConnectorInfo(
             "field_discovery",
@@ -31,29 +30,16 @@ class AgentCoreFieldDiscovery:
             ["DISCOVERY_AGENTCORE_ARN"],
         )
         self.simulated = False
-        self._client = boto3.client("bedrock-agentcore", region_name=settings.aws_region)
 
     def discover(self, oem: str, models: list[str], since_days: int) -> dict:
+        from ..agents import agentcore
         prompt = (
             f"Discover software, infotainment (IVI), ECU and HVAC field issues for OEM {oem} "
             f"(models: {', '.join(models) or 'all'}) from the last {since_days} days. "
             "Return a JSON object with keys: issues (list of objects with title, source, severity, "
             "summary, affected_models), sources (list of {name, simulated}), and total."
         )
-        session_id = (f"f2f-{re.sub('[^a-z0-9]', '', oem.lower())}-{uuid.uuid4().hex}{uuid.uuid4().hex}")[:64]
-        if len(session_id) < 33:  # API requires >= 33 chars
-            session_id = (session_id + uuid.uuid4().hex * 2)[:48]
-        resp = self._client.invoke_harness(
-            harnessArn=self.arn,
-            runtimeSessionId=session_id,
-            messages=[{"role": "user", "content": [{"text": prompt}]}],
-        )
-        text = ""
-        for event in resp.get("stream", []):
-            if "contentBlockDelta" in event:
-                delta = event["contentBlockDelta"].get("delta", {})
-                if "text" in delta:
-                    text += delta["text"]
+        text = agentcore.invoke(self.arn, prompt, tag=f"disc-{oem}")
         return _coerce_discovery(text, oem, models)
 
 
