@@ -3,10 +3,81 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import time
+import uuid
 
 from ..config import ROOT, settings
 from .base import ConnectorInfo
+
+
+class AgentCoreFieldDiscovery:
+    """Invokes a Bedrock AgentCore harness (invoke_harness) as the field-discovery agent.
+
+    Configure with DISCOVERY_AGENTCORE_ARN. Needs boto3 >= 1.43 (bedrock-agentcore client) and
+    the caller identity must hold bedrock-agentcore:InvokeHarness for the harness ARN.
+    """
+
+    def __init__(self):
+        import boto3
+        self.arn = os.environ["DISCOVERY_AGENTCORE_ARN"]
+        self.info = ConnectorInfo(
+            "field_discovery",
+            "Field Discovery Agent",
+            "AWS Bedrock AgentCore",
+            "signal_source",
+            "Bedrock AgentCore harness that discovers OEM software/ECU/HVAC field issues.",
+            "connected",
+            ["DISCOVERY_AGENTCORE_ARN"],
+        )
+        self.simulated = False
+        self._client = boto3.client("bedrock-agentcore", region_name=settings.aws_region)
+
+    def discover(self, oem: str, models: list[str], since_days: int) -> dict:
+        prompt = (
+            f"Discover software, infotainment (IVI), ECU and HVAC field issues for OEM {oem} "
+            f"(models: {', '.join(models) or 'all'}) from the last {since_days} days. "
+            "Return a JSON object with keys: issues (list of objects with title, source, severity, "
+            "summary, affected_models), sources (list of {name, simulated}), and total."
+        )
+        session_id = (f"f2f-{re.sub('[^a-z0-9]', '', oem.lower())}-{uuid.uuid4().hex}{uuid.uuid4().hex}")[:64]
+        if len(session_id) < 33:  # API requires >= 33 chars
+            session_id = (session_id + uuid.uuid4().hex * 2)[:48]
+        resp = self._client.invoke_harness(
+            harnessArn=self.arn,
+            runtimeSessionId=session_id,
+            messages=[{"role": "user", "content": [{"text": prompt}]}],
+        )
+        text = ""
+        for event in resp.get("stream", []):
+            if "contentBlockDelta" in event:
+                delta = event["contentBlockDelta"].get("delta", {})
+                if "text" in delta:
+                    text += delta["text"]
+        return _coerce_discovery(text, oem, models)
+
+
+def _coerce_discovery(text: str, oem: str, models: list[str]) -> dict:
+    """Parse a harness text response into the connector's {issues, sources, ...} contract."""
+    m = re.search(r"\{.*\}", text, re.S)
+    if m:
+        try:
+            data = json.loads(m.group(0))
+            data.setdefault("issues", [])
+            data.setdefault("sources", [{"name": "bedrock-agentcore", "simulated": False,
+                                         "count": len(data.get("issues", []))}])
+            data.setdefault("total", len(data.get("issues", [])))
+            data["simulated"] = False
+            return data
+        except json.JSONDecodeError:
+            pass
+    # Fall back to a single free-text issue so the pipeline still gets something usable.
+    return {
+        "issues": [{"title": f"{oem} field-discovery result", "source": "bedrock-agentcore",
+                    "severity": "medium", "summary": text[:2000], "affected_models": models}],
+        "sources": [{"name": "bedrock-agentcore", "simulated": False, "count": 1}],
+        "total": 1, "simulated": False,
+    }
 
 
 class BedrockAgentFieldDiscovery:
@@ -119,7 +190,9 @@ class SimulatedFieldDiscovery:
         }
 
 
-def field_discovery_connector() -> BedrockAgentFieldDiscovery | LambdaFieldDiscovery | SimulatedFieldDiscovery:
+def field_discovery_connector():
+    if os.environ.get("DISCOVERY_AGENTCORE_ARN"):
+        return AgentCoreFieldDiscovery()
     if settings.mode == "aws" and os.environ.get("BEDROCK_AGENT_ID"):
         return BedrockAgentFieldDiscovery()
     if os.environ.get("FIELD_DISCOVERY_LAMBDA_ARN"):
