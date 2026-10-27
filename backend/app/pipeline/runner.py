@@ -148,6 +148,16 @@ def handlers() -> dict[str, Callable[[StageContext], None]]:
             "fix": s.fix, "verify": s.verify, "approve": s.approve, "release": s.release, "monitor": s.monitor}
 
 
+def handler_for(case: Case, key: str) -> Callable[[StageContext], None]:
+    """Crashes of a registered on-vehicle app (issue-daemon) run the Device Crash Agent; everything else the built-in stages."""
+    from .. import device_apps
+    if device_apps.for_component(case.component):
+        from ..agents import device_crash
+        if key in device_crash.HANDLERS:
+            return device_crash.HANDLERS[key]
+    return handlers()[key]
+
+
 def init_stages(case: Case) -> None:
     for sd in STAGES:
         store.put_stage(StageRun(case_id=case.id, stage=sd.key, agent=sd.agent))
@@ -166,7 +176,7 @@ def _run_stage(case: Case, sd, shared: dict[str, Any]) -> StageStatus:
     ctx.update_case(current_stage=sd.key)
     ctx._save()
     try:
-        handlers()[sd.key](ctx)
+        handler_for(case, sd.key)(ctx)
         if run.status == StageStatus.running:
             run.status = StageStatus.passed
     except StageFailed as e:

@@ -1,0 +1,15 @@
+[Unit]
+Description=Reverse tunnel: Android VM on the vSkipGen host -> field-to-ota console
+After=network-online.target field-to-ota.service
+Wants=network-online.target
+
+[Service]
+User=ubuntu
+# DEVICE_SSH_HOST, DEVICE_SSH_KEY, DEVICE_ADB_SERIAL, PORT, DEVICE_TUNNEL_PORT
+EnvironmentFile=/home/ubuntu/.config/field-to-ota/device-tunnel.env
+ExecStart=/home/ubuntu/field-to-ota/scripts/device-tunnel.sh
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

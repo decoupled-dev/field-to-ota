@@ -1,0 +1,20 @@
+[Unit]
+Description=Field-to-Fix console (Loopback) with issue-daemon intake
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=ubuntu
+WorkingDirectory=/home/ubuntu/field-to-ota
+Environment=HOST=127.0.0.1
+Environment=PORT=8000
+# Settings (AWS_REGION, BEDROCK_MODEL_ID, F2F_DEVICE_APPS_FILE, ANDROID_HOME, HOST, PORT, ...)
+EnvironmentFile=/home/ubuntu/.config/field-to-ota/field-to-ota.env
+# F2F_DEVICE_API_KEY: bearer token the issue-daemon must send
+EnvironmentFile=/home/ubuntu/.config/field-to-ota/device_key.env
+ExecStart=/bin/sh -c 'exec /home/ubuntu/field-to-ota/.venv/bin/uvicorn backend.app.main:app --host "$HOST" --port "$PORT"'
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

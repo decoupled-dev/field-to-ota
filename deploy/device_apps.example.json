@@ -1,0 +1,21 @@
+{
+  "_comment": "Apps the issue-daemon reports crashes for. Key = Android package (crashing process). Copy to ~/.config/field-to-ota/device_apps.json and set F2F_DEVICE_APPS_FILE.",
+  "com.test.design": {
+    "name": "HVAC Climate app",
+    "component": "hvac",
+    "repo": "https://github.com/decoupled-dev/demo-app.git",
+    "branch": "climate-hvac-crash-demo",
+    "version": "climate-hvac-crash-demo",
+    "test_command": "./gradlew :app:testDebugUnitTest --console=plain",
+    "build_command": "./gradlew :app:assembleDebug --console=plain",
+    "apk_path": "app/build/outputs/apk/debug/app-debug.apk",
+    "launch": "am start -a com.test.design.action.OPEN_CLIMATE -n com.test.design/.MainActivity",
+    "monitor_seconds": 60,
+    "auto_open_case": true,
+    "device": {
+      "ssh_host": "ubuntu@<vskipgen-host>",
+      "ssh_key": "/home/ubuntu/.ssh/<team-key>.pem",
+      "adb_serial": "0.0.0.0:6520"
+    }
+  }
+}

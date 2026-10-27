@@ -61,6 +61,10 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Loopback", version="0.1.0", lifespan=lifespan)
 
+from .issue_daemon import router as issue_daemon_router  # noqa: E402
+
+app.include_router(issue_daemon_router)  # AAOS issue-daemon: /api/v1/issues, /api/v1/heartbeat
+
 
 # System ------------------------------------------------------------------------------------------
 @app.get("/api/health")
