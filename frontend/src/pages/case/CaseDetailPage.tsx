@@ -110,7 +110,7 @@ export default function CaseDetailPage() {
               />
             }
           />
-          <div className={cn(view === "v" && "blueprint px-3 py-4")}>
+          <div className={cn(view === "v" && "px-3 py-4")}>
             {!stages.length ? (
               <Skeleton className="m-4 h-[420px]" />
             ) : view === "v" ? (
