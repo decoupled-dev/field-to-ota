@@ -42,9 +42,29 @@ _SOFTWARE_HINTS = (
 )
 
 
-def _looks_software(*texts: str) -> bool:
-    blob = " ".join(t for t in texts if t).lower()
+# Strong component signals: if the COMPONENT field contains any of these, it's in scope regardless
+# of the summary. Keeps the focus on electronic-control / software / comfort-electronics defects.
+_COMPONENT_SIGNALS = (
+    "software", "control module", "control unit", "ecu", "ecm", "tcm", "bcm", "electrical",
+    "electronic", "hvac", "defroster", "defogger", "climate", "air condition", "telematics",
+    "infotainment", "display", "radio", "navigation", "camera", "sensor", "lighting control",
+    "forward collision", "lane", "cruise control", "instrument panel", "gauge", "cluster",
+)
+
+
+def _looks_software(component: str = "", summary: str = "") -> bool:
+    """In scope if the component clearly names an electronic/software/HVAC system, OR the summary
+    describes a software/electronic symptom. Component match is the stronger, primary signal."""
+    comp = (component or "").lower()
+    if any(sig in comp for sig in _COMPONENT_SIGNALS):
+        return True
+    blob = (summary or "").lower()
     return any(h in blob for h in _SOFTWARE_HINTS)
+
+
+def _pretty(model: str) -> str:
+    """Model names are URL-encoded for the API query; decode for human-readable titles."""
+    return model.replace("%20", " ").title()
 
 
 def _recent_enough(date_str: str, since_days: int) -> bool:
@@ -93,7 +113,7 @@ def _nhtsa_complaints(client: httpx.Client, make: str, model: str, year: int, si
     for c in results:
         summary = (c.get("summary") or "").strip()
         comp = (c.get("components") or "")
-        if not _looks_software(summary, comp):
+        if not _looks_software(comp, summary):
             continue
         if not _recent_enough(c.get("dateComplaintFiled") or c.get("dateOfIncident") or "", since_days):
             continue
@@ -101,7 +121,7 @@ def _nhtsa_complaints(client: httpx.Client, make: str, model: str, year: int, si
         out.append(Complaint(
             source_kind="nhtsa",
             source_name="NHTSA complaints",
-            title=f"{comp or 'NHTSA complaint'} — {make.title()} {model.title()} {year}",
+            title=f"{comp or 'NHTSA complaint'} — {make.title()} {_pretty(model)} {year}",
             body=summary,
             author=f"nhtsa-odi-{odi}" if odi else None,
             url=f"https://www.nhtsa.gov/vehicle/{year}/{make}/{model}#complaints",
@@ -130,7 +150,7 @@ def _nhtsa_recalls(client: httpx.Client, make: str, model: str, year: int) -> li
         out.append(Complaint(
             source_kind="nhtsa",
             source_name="NHTSA recalls",
-            title=f"{comp} — {make.title()} {model.title()} {year}",
+            title=f"{comp} — {make.title()} {_pretty(model)} {year}",
             body=summary,
             author=c.get("Manufacturer") or "NHTSA",
             url=f"https://www.nhtsa.gov/recalls?nhtsaId={campaign}" if campaign else None,
