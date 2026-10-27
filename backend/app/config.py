@@ -22,7 +22,9 @@ class Settings:
     public_url = _env("F2F_PUBLIC_URL", "http://127.0.0.1:8000")
 
     aws_region = _env("AWS_REGION", "us-east-1")
-    bedrock_model_id = _env("BEDROCK_MODEL_ID", "us.anthropic.claude-sonnet-4-5-20250929-v1:0")
+    # Default to Amazon Nova (available without a Marketplace subscription). Override with
+    # BEDROCK_MODEL_ID to use Claude where the account has that model access enabled.
+    bedrock_model_id = _env("BEDROCK_MODEL_ID", "us.amazon.nova-lite-v1:0")
     llm = _env("F2F_LLM", "auto")  # auto | bedrock | offline
     event_bus_name = _env("F2F_EVENT_BUS")  # EventBridge bus name (aws mode)
     iot_thing_group = _env("F2F_IOT_THING_GROUP", "f2f-affected-cohort")

@@ -55,7 +55,9 @@ def catalog() -> list[dict]:
         (ConnectorInfo("athena", "Amazon Athena", "AWS", "fleet_analytics", "SQL over fleet telemetry in S3.",
                        "connected" if live else "simulated"), ["fleet"]),
         (ConnectorInfo("fleetwise", "AWS IoT FleetWise", "AWS", "fleet_analytics", "Targeted signal collection campaigns.", "available"), []),
-        (ConnectorInfo("bedrock", "Amazon Bedrock", "AWS", "llm", "Claude models for the agents (Converse API).",
+        (ConnectorInfo("bedrock", "Amazon Bedrock", "AWS", "llm",
+                       f"{llm.model_label()} for the agents (Converse API)." if llm.available()
+                       else "Claude/Nova models for the agents (Converse API).",
                        "connected" if llm.available() else "simulated",
                        ["BEDROCK_MODEL_ID", "AWS_REGION"]), ["triage", "rca", "fix"]),
         (ConnectorInfo("hil", "dSPACE / Vector HIL", "dSPACE", "sim", "Hardware-in-the-loop benches for reproduction.", "available"), []),

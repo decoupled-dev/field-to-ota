@@ -33,7 +33,7 @@ sys.path.insert(0, str(ROOT))
 from sim import replay  # noqa: E402
 from sim.thermal import hal_ready_ms  # noqa: E402
 
-ENGINE = lambda: "Amazon Bedrock · Claude" if llm.available() else "offline analyzer (no Bedrock credentials)"  # noqa: E731
+ENGINE = lambda: llm.engine_label()  # noqa: E731
 
 from ..connectors.field_discovery import field_discovery_connector
 
@@ -402,7 +402,7 @@ def fix(ctx: StageContext) -> None:
     thermal_src = (ROOT / "sim" / "thermal.py").read_text()
     used = "playbook"
     if llm.available():
-        ctx.tool("bedrock.converse(model=claude, task=patch media_service)")
+        ctx.tool(f"bedrock.converse(model={settings.bedrock_model_id}, task=patch media_service)")
         out = llm.complete_json(FIX_SYS, f"Root cause:\n{json.dumps(rca_out)}\n\nconfig.py:\n{(wt / 'media_service/config.py').read_text()}\n\n"
                                          f"a2dp_manager.py:\n{(wt / 'media_service/a2dp_manager.py').read_text()}", 3000)
         if out and out.get("config_py") and out.get("a2dp_manager_py"):

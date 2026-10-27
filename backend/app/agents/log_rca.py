@@ -133,7 +133,7 @@ def analyze(ev: LogEvidence) -> dict:
     if llm.available():
         out = _analyze_bedrock(ev)
         if out:
-            out["engine"] = "Amazon Bedrock · Claude"
+            out["engine"] = llm.engine_label()
             return out
     out = _analyze_offline(ev)
     out["engine"] = "offline log analyzer (no Bedrock credentials)"

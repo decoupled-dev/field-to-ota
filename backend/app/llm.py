@@ -38,6 +38,21 @@ def mode() -> str:
     return "bedrock" if available() else "offline"
 
 
+def model_label() -> str:
+    """Human-readable label for the active model, derived from the configured model id."""
+    mid = settings.bedrock_model_id.lower()
+    family = ("Amazon Nova" if "nova" in mid else
+              "Anthropic Claude" if "claude" in mid else
+              "Amazon Titan" if "titan" in mid else
+              settings.bedrock_model_id)
+    return family
+
+
+def engine_label() -> str:
+    """Engine string used in stage outputs/artifacts."""
+    return f"Amazon Bedrock · {model_label()}" if available() else "offline analyzer (no Bedrock model access)"
+
+
 def complete(system: str, prompt: str, max_tokens: int = 2000) -> str | None:
     client = _client()
     if client is None:

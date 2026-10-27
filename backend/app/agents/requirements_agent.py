@@ -135,7 +135,7 @@ def _assess_bedrock(candidates: list[Requirement], observed: str, conditions: li
         rationale=str(data.get("rationale", ""))[:400],
         trace=_trace(chosen),
         confidence=float(data.get("confidence", 0.6)),
-        engine="Amazon Bedrock · Claude",
+        engine=llm.engine_label(),
     )
 
 
