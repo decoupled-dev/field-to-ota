@@ -12,6 +12,8 @@ Environment=PORT=8000
 EnvironmentFile=/home/ubuntu/.config/field-to-ota/field-to-ota.env
 # F2F_DEVICE_API_KEY: bearer token the issue-daemon must send
 EnvironmentFile=/home/ubuntu/.config/field-to-ota/device_key.env
+# F2F_GITHUB_TOKEN: pushes Device Crash Agent fix branches (optional)
+EnvironmentFile=-/home/ubuntu/.config/field-to-ota/github.env
 ExecStart=/bin/sh -c 'exec /home/ubuntu/field-to-ota/.venv/bin/uvicorn backend.app.main:app --host "$HOST" --port "$PORT"'
 Restart=on-failure
 RestartSec=5

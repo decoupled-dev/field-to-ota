@@ -119,16 +119,37 @@ def _fun_range(text: str, name: str) -> tuple[int, int] | None:
     """1-based line range of a top-level / member Kotlin function `fun name(`."""
     lines = text.splitlines()
     for i, l in enumerate(lines):
-        if re.search(rf"\bfun\s+(?:<[^>]+>\s*)?(?:[\w.]+\.)?{re.escape(name)}\s*\(", l):
-            depth, started = 0, False
-            for j in range(i, len(lines)):
-                depth += lines[j].count("{") - lines[j].count("}")
-                started = started or "{" in lines[j]
-                if started and depth <= 0:
-                    return i + 1, j + 1
-                if not started and "=" in lines[j] and j > i:  # expression body
-                    return i + 1, j + 1
-            return i + 1, len(lines)
+        if not re.search(rf"\bfun\s+(?:<[^>]+>\s*)?(?:[\w.]+\.)?{re.escape(name)}\s*\(", l):
+            continue
+        start = i - 1  # include annotations / KDoc directly above
+        while start >= 0 and (lines[start].strip().startswith("@") or lines[start].strip().startswith(("*", "/**", "*/"))):
+            start -= 1
+        start += 1
+        # 1. skip the parameter list (parens), 2. block body {...} or expression body = ...
+        parens, j, k = 0, i, l.index("fun")
+        seen_open = False
+        while j < len(lines):
+            s = lines[j][k:] if j == i else lines[j]
+            for pos, ch in enumerate(s):
+                if ch == "(":
+                    parens, seen_open = parens + 1, True
+                elif ch == ")":
+                    parens -= 1
+                elif seen_open and parens == 0 and ch in "{=":
+                    if ch == "=":  # expression body: until the next blank or top-level line
+                        e = j
+                        while e + 1 < len(lines) and lines[e + 1].strip() and lines[e + 1][:1].isspace():
+                            e += 1
+                        return start + 1, e + 1
+                    depth = 0
+                    for e in range(j, len(lines)):
+                        seg = s[pos:] if e == j else lines[e]
+                        depth += seg.count("{") - seg.count("}")
+                        if depth <= 0:
+                            return start + 1, e + 1
+                    return start + 1, len(lines)
+            j += 1
+        return start + 1, len(lines)
     return None
 
 
@@ -245,10 +266,11 @@ def reproduce(ctx: StageContext) -> None:
     target = _target(app)
     wt = ctx.workdir / "repo"
     ctx.run.connector = "Gradle unit tests"
-    ctx.tool(f"git clone --branch {target.branch} {target.url}")
+    src = app.get("clone_url") or target.url  # clone_url: optional mirror of the deployed source
+    ctx.tool(f"git clone --branch {target.branch} {src}")
     if wt.exists():
         _sh(["rm", "-rf", str(wt)])
-    p = _sh(["git", "clone", "-q", "--branch", target.branch, target.url, str(wt)], timeout=600)
+    p = _sh(["git", "clone", "-q", "--branch", target.branch, src, str(wt)], timeout=600)
     if p.returncode != 0:
         raise StageFailed(f"clone failed: {p.stderr[:300]}")
     ctx.shared["repo"] = str(wt)
@@ -338,25 +360,30 @@ def fix(ctx: StageContext) -> None:
     app = _app(ctx)
     wt, fault = _repo(ctx), ctx.shared["fault"]
     target = _target(app)
-    ctx.run.connector = "External Fix agent + review remote"
-    ctx.tool(f"fix_agent.apply(file={fault['file']}, model={settings.bedrock_model_id if llm.available() else 'offline'})")
-    res = fix_agent.apply(wt, fault["file"], ctx.shared["root_cause"], target)
+    ctx.run.connector = "Fix agent (Bedrock, test-validated) + GitHub"
+    res = _function_fix(ctx, wt, fault, target)
+    if not res:
+        ctx.tool(f"fix_agent.playbook_fix({fault['file']})")
+        res = _playbook(wt, fault)
     if not res.applied:
         raise StageFailed(res.summary)
     ctx.log(f"{res.strategy}: {res.summary}")
     ctx.artifact(f"Patch for {fault['file']}", "diff", content=res.diff)
-    branch = f"fix/{ctx.case.id.lower()}-{fault['function'].lower()}"
+    branch = f"{app.get('branch_prefix', 'dev/')}{ctx.case.id}"
     issue = (store.get_doc("kv", f"case-issue:{ctx.case.id}") or {}).get("key", ctx.case.id)
-    er.git(wt, "checkout", "-q", "-b", branch)
+    er.git(wt, "checkout", "-q", "-B", branch)
     er.git(wt, "-c", "user.name=Loopback Fix Agent", "-c", "user.email=fix-agent@loopback.local", "commit", "-q", "-am",
-           f"fix: restore guard in {fault['function']} ({issue})\n\nRoot cause: {ctx.shared['root_cause']}\n"
+           f"fix({ctx.case.id}): {fault['function']} crash ({issue})\n\nRoot cause: {ctx.shared['root_cause']}\n"
            f"Regression: {fault.get('culprit_sha')} {fault.get('culprit_subject')}\nCase: {ctx.case.id}")
-    remote = settings.workspace_dir / "remote" / f"{app['package']}.git"
-    if not remote.exists():
-        remote.parent.mkdir(parents=True, exist_ok=True)
-        _sh(["git", "init", "-q", "--bare", str(remote)])
-    er.git(wt, "push", "-q", "--force", str(remote), f"HEAD:refs/heads/{branch}")
-    ctx.tool(f"git push review-remote {branch}")
+    pushed, url = _push(ctx, wt, app, branch)
+    if not pushed:
+        remote = settings.workspace_dir / "remote" / f"{app['package']}.git"
+        if not remote.exists():
+            remote.parent.mkdir(parents=True, exist_ok=True)
+            _sh(["git", "init", "-q", "--bare", str(remote)])
+        er.git(wt, "push", "-q", "--force", str(remote), f"HEAD:refs/heads/{branch}")
+        ctx.tool(f"git push review-remote {branch} (local fallback)")
+    ctx.shared["pushed_to"] = url or "local review remote"
     body = (f"## {ctx.case.title}\n\nFixes {issue} · Loopback case `{ctx.case.id}`\n\n**Root cause.** {ctx.shared['root_cause']}\n\n"
             f"**Change.** {res.summary}\n\n**Traceability.** {', '.join(ctx.shared.get('requirements') or ['-'])}\n\n"
             f"_Opened by the {AGENT}; requires human approval before OTA._")
@@ -364,11 +391,79 @@ def fix(ctx: StageContext) -> None:
     store.put_doc("kv", f"pr:{branch}", {"branch": branch, "title": f"fix: {fault['function']} crash ({issue})", "body": body, "diff": diff,
                                          "case_id": ctx.case.id, "status": "open",
                                          "commits": er.git(wt, "log", "--format=%h %s", f"{ctx.shared['baseline_sha']}..HEAD")})
-    ctx.link("github", f"PR · {branch}", f"{settings.public_url}/tools/pulls/{branch}")
+    ctx.link("github", f"Branch · {branch}", url or f"{settings.public_url}/tools/pulls/{branch}")
     ctx.shared.update(branch=branch, fix_strategy=res.strategy, fix_sha=er.git(wt, "rev-parse", "--short", "HEAD"))
     if issue:
-        issue_tracker().comment(issue, f"Fix proposed on {branch}")
-    ctx.set(f"Fix committed on {branch} ({res.strategy}).", branch=branch, strategy=res.strategy, file=fault["file"])
+        issue_tracker().comment(issue, f"Fix pushed to {branch}: {url or 'local review remote'}")
+    ctx.set(f"Fix ({res.strategy}) pushed to {branch}" + (" on GitHub." if pushed else " (local review remote; GitHub push failed)."),
+            branch=branch, strategy=res.strategy, file=fault["file"], pushed_to=ctx.shared["pushed_to"])
+
+
+FUNC_FIX_SYS = ("You fix a crash in one Kotlin function. You get the root cause, the failing tests and the function source. "
+                "Return JSON with one key 'function' holding the COMPLETE corrected function (same signature, same annotations "
+                "and KDoc if present). Make the smallest change that fixes the defect. No commentary.")
+
+
+def _function_fix(ctx: StageContext, wt: Path, fault: dict, target: er.RepoTarget) -> fix_agent.FixResult | None:
+    """Ask Bedrock for a corrected version of only the faulty function; keep it only if all tests pass."""
+    if not llm.available():
+        return None
+    f = wt / fault["file"]
+    original = f.read_text()
+    r = _fun_range(original, fault["function"])
+    if not r:
+        return None
+    lines = original.splitlines()
+    func_src = "\n".join(lines[r[0] - 1:r[1]])
+    failures = "\n".join(f"- {x['class']}.{x['test']}: {x['message'][:300]}" for x in ctx.shared.get("failures", []))
+    ctx.tool(f"bedrock.converse(model={settings.bedrock_model_id}, task=patch {fault['function']}())")
+    out = llm.complete_json(FUNC_FIX_SYS, f"Root cause:\n{ctx.shared['root_cause']}\n\nFailing tests:\n{failures}\n\nFunction:\n{func_src}", 1500)
+    new_func = (out or {}).get("function", "").strip("\n")
+    if not new_func or f"fun {fault['function']}" not in new_func or new_func == func_src:
+        ctx.log("Bedrock did not return a usable patch", "warn")
+        return None
+    patched = "\n".join(lines[:r[0] - 1] + new_func.splitlines() + lines[r[1]:]) + ("\n" if original.endswith("\n") else "")
+    if "roundToInt" in new_func and "import kotlin.math.roundToInt" not in patched:
+        patched = patched.replace("\nimport ", "\nimport kotlin.math.roundToInt\nimport ", 1)
+    f.write_text(patched)
+    ctx.tool(f"validate patch: {target.test_command or er.detect_test_command(wt)}")
+    res = er.run_tests(wt, target)
+    if not res.ok:
+        ctx.log(f"Bedrock patch fails the tests ({res.summary_line}); reverting", "warn")
+        f.write_text(original)
+        return None
+    return fix_agent.FixResult(True, fault["file"], "bedrock", er.git(wt, "diff", "--", fault["file"]),
+                               f"Bedrock patched {fault['function']}(); all unit tests pass.")
+
+
+def _playbook(wt: Path, fault: dict) -> fix_agent.FixResult:
+    f = wt / fault["file"]
+    pb = fix_agent.playbook_fix(f.read_text())
+    if not pb:
+        return fix_agent.FixResult(False, fault["file"], "none", "", "No fix strategy matched the defect; manual patch required.")
+    f.write_text(pb[0])
+    return fix_agent.FixResult(True, fault["file"], "playbook", er.git(wt, "diff", "--", fault["file"]), f"Reviewed playbook fix: {pb[1]}.")
+
+
+def _push(ctx: StageContext, wt: Path, app: dict, branch: str) -> tuple[bool, str | None]:
+    """Push the fix branch to the app's GitHub repo with F2F_GITHUB_TOKEN (never stored in git config)."""
+    import os
+    token = os.environ.get("F2F_GITHUB_TOKEN")
+    m = re.match(r"https://github\.com/([^/]+/[^/.]+)", app["repo"])
+    if not token or not m:
+        ctx.log("F2F_GITHUB_TOKEN not set; skipping GitHub push", "warn")
+        return False, None
+    ctx.tool(f"git push origin {branch}  ({m.group(1)})")
+    helper = "!f() { echo username=x-access-token; echo \"password=$F2F_GITHUB_TOKEN\"; }; f"
+    p = subprocess.run(["git", "-c", "credential.helper=", "-c", f"credential.helper={helper}", "push", "--force", app["repo"],
+                        f"HEAD:refs/heads/{branch}"], cwd=wt, capture_output=True, text=True, timeout=300,
+                       env={**os.environ, "GIT_TERMINAL_PROMPT": "0"})
+    if p.returncode != 0:
+        ctx.log(f"GitHub push failed: {p.stderr.strip().splitlines()[-1][:200] if p.stderr.strip() else p.returncode}", "error")
+        return False, None
+    url = f"https://github.com/{m.group(1)}/tree/{branch}"
+    ctx.log(f"pushed {branch} → {url}")
+    return True, url
 
 
 def verify(ctx: StageContext) -> None:

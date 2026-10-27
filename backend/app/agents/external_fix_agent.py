@@ -8,6 +8,7 @@ of the built-in media-service fix stage, but works on any repository (e.g. the K
 from __future__ import annotations
 
 import logging
+import re
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -50,6 +51,16 @@ def playbook_fix(current: str) -> tuple[str, str] | None:
     guard clause was removed. We restore a guard in front of the risky expression.
     """
     lines = current.splitlines()
+    # Shape 2 (the HVAC +/- demo): a Float step truncated with toInt() before an integer division,
+    # e.g. `(max - min).toInt() / step.toInt()` -> divide by zero for 0.5 steps. Divide as Float.
+    trunc = re.compile(r"\(([^()]+)\)\.toInt\(\)\s*/\s*(\w+)\.toInt\(\)")
+    for i, line in enumerate(lines):
+        if trunc.search(line):
+            lines[i] = trunc.sub(r"((\1) / \2).roundToInt()", line)
+            new = "\n".join(lines) + ("\n" if current.endswith("\n") else "")
+            if "import kotlin.math.roundToInt" not in new and "roundToInt" not in current:
+                new = new.replace("\nimport ", "\nimport kotlin.math.roundToInt\nimport ", 1)
+            return new, "divide by the Float step instead of truncating it to Int (0.5 °C step became 0)"
     for i, line in enumerate(lines):
         # Restore the fan-speed guard removed to introduce the crash.
         if "positionPx / widthPx" in line and "maxFanSpeed" in current:

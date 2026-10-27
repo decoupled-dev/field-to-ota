@@ -76,6 +76,13 @@ def _vector(sig: Signal) -> dict:
     return dict(base)
 
 
+def _case_finished(cluster: dict) -> bool:
+    if not cluster.get("case_id"):
+        return False
+    case = store.get_case(cluster["case_id"])
+    return bool(case and case.status.value in ("closed", "failed"))
+
+
 def assign(sig: Signal) -> dict | None:
     """Attach a triaged bug signal to the best matching cluster (or a new one). Returns the cluster."""
     if not sig.is_bug:
@@ -84,6 +91,8 @@ def assign(sig: Signal) -> dict | None:
     best, best_sim = None, 0.0
     for c in store.list_docs("clusters"):
         if c.get("component") != sig.component:
+            continue
+        if _case_finished(c):  # a report after the case closed is a recurrence: start a new cluster
             continue
         sim = _cos(vec, c["vector"])
         if sim > best_sim:
