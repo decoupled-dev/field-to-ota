@@ -244,6 +244,30 @@ def rca(ctx: StageContext) -> None:
     wt = Path(ctx.shared.get("repo") or checkout(ctx.case.id))
     scm = source_control()
     ctx.run.connector = scm.info.name
+
+    # --- Log analysis first: read the actual log evidence and derive a root cause from it --------
+    from . import log_rca
+    ctx.thought("Gathering the log evidence for this case: hu-sentinel device bundle, the replay boot "
+                "log, and the field reports. Analyzing it before correlating with source history.")
+    log_text, log_sources = log_rca.collect_logs(ctx.case.id, _signals(ctx), ctx.shared)
+    log_ev = log_rca.extract(log_text, log_sources)
+    ctx.tool(f"log_analyzer.scan(sources={log_sources or ['none']}) → {log_ev.total_lines} lines, "
+             f"{len(log_ev.error_lines)} errors, {len(log_ev.warn_lines)} warnings")
+    for name, n in log_ev.top_tags[:5]:
+        ctx.log(f"log tag {name}: {n} lines")
+    if log_ev.symptoms:
+        ctx.log(f"symptoms detected in logs: {', '.join(log_ev.symptoms)}"
+                + (f"; ambient {log_ev.ambient_c} °C" if log_ev.ambient_c is not None else ""))
+    log_finding = log_rca.analyze(log_ev)
+    ctx.log(f"log-based root cause ({log_finding['engine']}, confidence {log_finding.get('confidence')}): "
+            f"{log_finding['root_cause']}")
+    ctx.artifact("Log evidence (extracted)", "json", content={
+        "sources": log_ev.sources, "total_lines": log_ev.total_lines, "symptoms": log_ev.symptoms,
+        "ambient_c": log_ev.ambient_c, "first_error_ms": log_ev.first_error_ms,
+        "top_tags": log_ev.top_tags, "errors": log_ev.error_lines[:20], "warnings": log_ev.warn_lines[:20]})
+    ctx.artifact("Log-based root-cause analysis", "json", content=log_finding)
+    ctx.shared["log_rca"] = log_finding
+
     ctx.tool("git log --oneline v2.2.9..v2.3.1 -- media_service/ docs/requirements/")
     commits = git(wt, "log", "--format=%h %ad %s", "--date=short", "v2.2.9..v2.3.1")
     ctx.log(commits)
@@ -280,13 +304,19 @@ def rca(ctx: StageContext) -> None:
                          "Device log: 'audio HAL not ready after 200ms, starting stream anyway' followed by AudioFlinger underruns",
                          "Design doc step 3 allows streaming before HAL ready ('to keep latency low')"],
         }
+    # Carry the log analyzer's independent findings alongside the commit-correlated RCA.
+    out.setdefault("log_sources", log_ev.sources)
+    out.setdefault("log_symptoms", log_ev.symptoms)
+    out.setdefault("log_confidence", log_finding.get("confidence"))
+    if log_finding.get("evidence"):
+        out["evidence"] = list(dict.fromkeys(list(out.get("evidence", [])) + log_finding["evidence"]))
     for step in out.get("mechanism", []):
         ctx.log(f"→ {step}")
     ctx.shared["rca"] = out
     ctx.shared["regression_sha"] = sha
     ctx.artifact("Root-cause analysis", "json", content=out)
     ctx.set(out["root_cause"], out.get("escape_reason", ""), origin=out.get("origin"), confidence=out.get("confidence"),
-            regression_commit=sha, engine=ENGINE())
+            regression_commit=sha, log_sources=log_ev.sources, log_symptoms=log_ev.symptoms, engine=ENGINE())
 
 
 # 7. Requirement ----------------------------------------------------------------------------------
