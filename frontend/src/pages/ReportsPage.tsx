@@ -1,18 +1,21 @@
-import { ArrowUpRight } from "lucide-react";
-import { Link } from "react-router-dom";
+import { ArrowUpRight, Car, FileCheck2, FileSearch, FileText, type LucideIcon } from "lucide-react";
 import { api, reportUrl, type Case } from "@/lib/api";
 import { useAsync } from "@/lib/hooks";
 import { PageBody, PageHeader } from "@/components/layout/Page";
 import { Card } from "@/components/ui/card";
 import { Empty, ErrorState, Skeleton } from "@/components/ui/states";
-import { CaseStatusChip } from "@/components/domain";
+import { CaseStatusChip, IssueKey } from "@/components/domain";
 
 const FALLBACK = [
   { type: "evidence", title: "Evidence pack", description: "Traceability matrix complaint → requirement → commit → test → release (ASPICE, UNECE R156)." },
   { type: "rca", title: "Root cause analysis", description: "Evidence chain from field logs and code to the defect mechanism." },
   { type: "fleet", title: "Fleet impact", description: "Affected cohort, segmentation and OTA rollout results." },
 ];
-const CODE: Record<string, string> = { evidence: "EVP", rca: "RCA", fleet: "FLT" };
+const KIND: Record<string, { icon: LucideIcon; cls: string }> = {
+  evidence: { icon: FileCheck2, cls: "bg-ok/10 text-ok" },
+  rca: { icon: FileSearch, cls: "bg-info/10 text-info" },
+  fleet: { icon: Car, cls: "bg-accent/10 text-accent" },
+};
 
 export default function ReportsPage() {
   const cases = useAsync(api.cases, []);
@@ -26,7 +29,7 @@ export default function ReportsPage() {
       ) : !cases.data.length ? (
         <Card><Empty title="No reports yet" hint="Reports are generated as a case moves through the pipeline." /></Card>
       ) : (
-        <div className="space-y-8">{cases.data.map((c) => <CaseReports key={c.id} c={c} />)}</div>
+        <div className="space-y-5">{cases.data.map((c) => <CaseReports key={c.id} c={c} />)}</div>
       )}
     </PageBody>
   );
@@ -36,42 +39,35 @@ function CaseReports({ c }: { c: Case }) {
   const reports = useAsync(() => api.reports(c.id), [c.id]);
   const list = reports.data ?? (reports.error ? FALLBACK.map((r) => ({ ...r, url: reportUrl(c.id, r.type) })) : []);
   return (
-    <section>
-      <div className="mb-3 flex flex-wrap items-center gap-3">
-        <Link to={`/cases/${c.id}`} className="font-mono text-[12px] text-muted hover:text-accent">{c.id}</Link>
-        <h2 className="text-[15px] font-semibold tracking-tight">{c.title}</h2>
+    <Card className="overflow-hidden">
+      <div className="flex flex-wrap items-center gap-3 border-b border-border px-4 py-3">
+        <IssueKey id={c.id} />
+        <h2 className="min-w-0 flex-1 truncate text-[15px] font-semibold">{c.title}</h2>
         <CaseStatusChip status={c.status} />
       </div>
       {reports.loading && !reports.data ? (
-        <div className="grid gap-4 md:grid-cols-3"><Skeleton className="h-36" /><Skeleton className="h-36" /><Skeleton className="h-36" /></div>
+        <div className="space-y-2 p-4"><Skeleton className="h-10" /><Skeleton className="h-10" /><Skeleton className="h-10" /></div>
       ) : (
-        <div className="grid gap-4 md:grid-cols-3">
-          {list.map((r) => (
-            <a
-              key={r.type}
-              href={r.url || reportUrl(c.id, r.type)}
-              target="_blank"
-              rel="noreferrer"
-              className="group relative flex min-h-[148px] flex-col overflow-hidden rounded-md border border-border bg-surface p-4 transition-colors hover:border-strong"
-            >
-              <div className="flex items-center gap-2">
-                <span className="rounded-sm bg-fg px-1.5 py-0.5 font-mono text-[9.5px] font-medium tracking-[0.1em] text-bg">{CODE[r.type] ?? r.type.slice(0, 3).toUpperCase()}</span>
-                <span className="text-xs text-faint">{c.id}</span>
-              </div>
-              <div className="mt-4 flex items-center gap-1.5 text-[15px] font-semibold tracking-tight">
-                {r.title}
-                <ArrowUpRight size={14} className="text-faint transition-colors group-hover:text-accent" />
-              </div>
-              <div className="mt-1 text-xs leading-5 text-muted">{r.description}</div>
-              <div className="mt-auto space-y-1 pt-4" aria-hidden>
-                <span className="block h-px w-full bg-border" />
-                <span className="block h-px w-4/5 bg-border" />
-                <span className="block h-px w-3/5 bg-border" />
-              </div>
-            </a>
-          ))}
-        </div>
+        <ul className="divide-y divide-border">
+          {list.map((r) => {
+            const k = KIND[r.type] ?? { icon: FileText, cls: "bg-subtle text-muted" };
+            return (
+              <li key={r.type}>
+                <a href={r.url || reportUrl(c.id, r.type)} target="_blank" rel="noreferrer" className="group flex items-center gap-4 px-4 py-3 transition-colors hover:bg-subtle/70">
+                  <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-md ${k.cls}`}><k.icon size={17} /></span>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm font-semibold text-fg group-hover:text-accent">{r.title}</div>
+                    <div className="truncate text-xs text-faint">{r.description}</div>
+                  </div>
+                  <span className="inline-flex shrink-0 items-center gap-1 rounded bg-fg/[0.06] px-2.5 py-1.5 text-xs font-medium text-fg group-hover:bg-fg/[0.10]">
+                    Open <ArrowUpRight size={13} />
+                  </span>
+                </a>
+              </li>
+            );
+          })}
+        </ul>
       )}
-    </section>
+    </Card>
   );
 }

@@ -73,7 +73,7 @@ export function ArtifactView({ artifact }: { artifact: Artifact }) {
         )}
       </div>
       {body}
-      {!body && !path && <div className="px-3 py-2 font-mono text-2xs text-faint">No preview available.</div>}
+      {!body && !path && <div className="px-3 py-2 text-2xs text-faint">No preview available.</div>}
     </div>
   );
 }

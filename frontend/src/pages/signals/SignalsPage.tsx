@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { ArrowUpRight, Clock, FolderOpen, Layers, ListChecks, Package, Search, Tag, Users, X } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { ArrowUpRight, Clock, Layers, ListChecks, Package, Search, Tag, Users, X } from "lucide-react";
 import { api, type Cluster, type Signal } from "@/lib/api";
 import { useAsync, useEventStream } from "@/lib/hooks";
 import { PageBody, PageHeader } from "@/components/layout/Page";
@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/field";
 import { Sheet } from "@/components/ui/sheet";
 import { Empty, ErrorState, Skeleton } from "@/components/ui/states";
 import { Table, Td, Th, Tr } from "@/components/ui/table";
-import { SeverityBadge, SOURCE_META, SourceBadge } from "@/components/domain";
+import { IssueKey, SeverityBadge, SOURCE_META, SourceBadge } from "@/components/domain";
 import { AgentFeed, SourceBoard, useIntake } from "./IntakeBoard";
 import { cn, fmtTime, humanize, timeAgo } from "@/lib/utils";
 
@@ -93,10 +93,8 @@ export default function SignalsPage() {
                       <div className="truncate text-[13px] font-medium">{s.title}</div>
                     </Td>
                     <Td><SeverityBadge severity={s.severity} /></Td>
-                    <Td className="whitespace-nowrap font-mono text-[12px]">
-                      {s.case_id ? (
-                        <Link to={`/cases/${s.case_id}`} onClick={(e) => e.stopPropagation()} className="inline-flex items-center gap-1 text-accent hover:underline"><FolderOpen size={12} />{s.case_id}</Link>
-                      ) : <span className="text-faint">—</span>}
+                    <Td className="whitespace-nowrap">
+                      {s.case_id ? <IssueKey id={s.case_id} /> : <span className="text-faint">—</span>}
                     </Td>
                     <Td className="tnum whitespace-nowrap text-right text-xs text-faint">{timeAgo(s.created_at)}</Td>
                   </Tr>
@@ -167,24 +165,20 @@ function ClustersPanel({ clusters, loading, error, onChange }: { clusters?: Clus
                     <div className="text-[13px] font-medium leading-5">{c.title}</div>
                     <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-faint">
                       <span className="inline-flex items-center gap-1"><Tag size={11} />{c.component ?? "Unclassified"}</span>
-                      {c.sw_version && <span className="inline-flex items-center gap-1 font-mono"><Package size={11} />{c.sw_version}</span>}
+                      {c.sw_version && <span className="inline-flex items-center gap-1"><Package size={11} />{c.sw_version}</span>}
                       <span className="inline-flex items-center gap-1"><Users size={11} />{c.authors}</span>
                       <span className="inline-flex items-center gap-1"><Clock size={11} />{timeAgo(c.last_seen)}</span>
                     </div>
                   </div>
                   {c.case_id ? (
-                    <Link to={`/cases/${c.case_id}`} className="inline-flex shrink-0 items-center gap-1 font-mono text-[12px] text-accent hover:underline">
-                      <FolderOpen size={12} />
-                      {c.case_id}
-                      <ArrowUpRight size={11} />
-                    </Link>
+                    <IssueKey id={c.case_id} className="shrink-0" />
                   ) : (
                     <Button size="sm" variant="secondary" disabled={busy === c.id} onClick={() => promote(c.id)}>Promote</Button>
                   )}
                 </div>
                 <div className="mt-3 flex items-center gap-3">
                   <ThresholdGauge score={c.authors} threshold={c.threshold} crossed={crossed} />
-                  <span className={cn("tnum shrink-0 font-mono text-[12px]", crossed ? "text-ok" : "text-fg")}>
+                  <span className={cn("tnum shrink-0 text-xs", crossed ? "text-ok" : "text-fg")}>
                     {c.authors}<span className="text-faint">/{c.threshold} reporters</span>
                   </span>
                 </div>
@@ -210,17 +204,17 @@ function SignalSheet({ signal, onClose }: { signal: Signal | null; onClose: () =
   const fields: [string, React.ReactNode][] = s
     ? [
         ["Source", <SourceBadge source={s.source} />],
-        ["Received", <span className="font-mono text-[12px]">{fmtTime(s.created_at)}</span>],
+        ["Received", <span className="text-sm">{fmtTime(s.created_at)}</span>],
         ["Author", s.author ?? "—"],
-        ["Component", <span className="font-mono text-[12px]">{s.component ?? "—"}</span>],
+        ["Component", <span className="text-sm">{s.component ?? "—"}</span>],
         ["SW version", <span className="font-mono text-[12px]">{s.sw_version ?? "—"}</span>],
         ["Vehicle model", s.vehicle_model ?? "—"],
         ["Severity", <SeverityBadge severity={s.severity} />],
         ["Classified as bug", s.is_bug == null ? "—" : s.is_bug ? "Yes" : "No"],
-        ["Cluster", <span className="font-mono text-[12px]">{s.cluster_id ?? "—"}</span>],
-        ["Case", s.case_id ? <Link to={`/cases/${s.case_id}`} className="font-mono text-[12px] text-accent hover:underline">{s.case_id}</Link> : "—"],
+        ["Cluster", <span className="text-sm">{s.cluster_id ?? "—"}</span>],
+        ["Case", s.case_id ? <IssueKey id={s.case_id} /> : "—"],
         ...(s.vin ? ([["VIN", <span className="font-mono text-[12px]">{s.vin}</span>]] as [string, React.ReactNode][]) : []),
-        ...(s.rule_id ? ([["Rule", <span className="font-mono text-[12px]">{s.rule_id}</span>]] as [string, React.ReactNode][]) : []),
+        ...(s.rule_id ? ([["Rule", <span className="text-sm">{s.rule_id}</span>]] as [string, React.ReactNode][]) : []),
       ]
     : [];
   return (
@@ -245,7 +239,7 @@ function SignalSheet({ signal, onClose }: { signal: Signal | null; onClose: () =
             <div>
               <div className="label mb-2">Conditions</div>
               <div className="flex flex-wrap gap-1.5">
-                {s.conditions.map((c) => <span key={c} className="rounded-sm border border-border bg-raised px-1.5 py-0.5 font-mono text-2xs">{c}</span>)}
+                {s.conditions.map((c) => <span key={c} className="rounded-sm border border-border bg-raised px-1.5 py-0.5 text-2xs">{c}</span>)}
               </div>
             </div>
           )}
@@ -256,7 +250,7 @@ function SignalSheet({ signal, onClose }: { signal: Signal | null; onClose: () =
                 {Object.entries(s.metrics).map(([k, v]) => (
                   <div key={k} className="bg-surface px-3 py-2.5">
                     <dt className="label">{humanize(k)}</dt>
-                    <dd className="tnum mt-1 font-mono text-[15px]">{typeof v === "object" ? JSON.stringify(v) : String(v)}</dd>
+                    <dd className="tnum mt-1 text-[15px]">{typeof v === "object" ? JSON.stringify(v) : String(v)}</dd>
                   </div>
                 ))}
               </dl>

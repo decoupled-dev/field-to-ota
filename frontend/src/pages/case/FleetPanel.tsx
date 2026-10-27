@@ -69,8 +69,8 @@ export function FleetPanel({ caseId, refreshKey }: { caseId: string; refreshKey:
                   <Td className="font-mono text-[12px]">{v.vin}</Td>
                   <Td className="text-[12.5px]">{v.region}</Td>
                   <Td className="font-mono text-[12px]">{v.sw_version}</Td>
-                  <Td className="tnum text-right font-mono text-[12px]">{v.min_temp_c.toFixed(1)} °C</Td>
-                  <Td className={cn("tnum text-right font-mono text-[12px]", v.underruns > 0 ? "text-accent" : "text-ok")}>{v.underruns}</Td>
+                  <Td className="tnum text-right text-sm">{v.min_temp_c.toFixed(1)} °C</Td>
+                  <Td className={cn("tnum text-right text-sm", v.underruns > 0 ? "text-accent" : "text-ok")}>{v.underruns}</Td>
                   <Td><OtaBadge status={v.ota_status} /></Td>
                 </Tr>
               ))}
@@ -129,7 +129,7 @@ function Rollout({ f }: { f: Fleet }) {
             {stats.map(([k, v, cls]) => (
               <div key={k} className="px-3 first:pl-0">
                 <dt className="label">{k}</dt>
-                <dd className={cn("tnum mt-0.5 font-mono text-[18px]", cls)}>{v}</dd>
+                <dd className={cn("tnum mt-0.5 text-[18px]", cls)}>{v}</dd>
               </div>
             ))}
           </dl>

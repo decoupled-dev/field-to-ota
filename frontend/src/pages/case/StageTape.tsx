@@ -1,14 +1,6 @@
 import type { StageDef, StageRun, StageStatus } from "@/lib/api";
-import { STATUS_LABEL, StatusIcon } from "@/components/domain";
+import { PHASES, STATUS_LABEL, StatusIcon } from "@/components/domain";
 import { cn, fmtDuration } from "@/lib/utils";
-
-// Phases mirror the Step Functions groups in infra/app.py.
-const PHASES: { title: string; keys: string[] }[] = [
-  { title: "Intake", keys: ["detect", "triage", "ticket"] },
-  { title: "Diagnose", keys: ["fleet", "reproduce", "rca"] },
-  { title: "Engineer", keys: ["requirement", "fix", "verify"] },
-  { title: "Release", keys: ["approve", "release", "monitor"] },
-];
 
 const BAR: Record<StageStatus, string> = {
   pending: "bg-border",

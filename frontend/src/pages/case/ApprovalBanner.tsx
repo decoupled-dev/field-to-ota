@@ -56,7 +56,7 @@ export function ApprovalBanner({ caseId, run, onDone }: { caseId: string; run: S
               {evidence.map(([k, v]) => (
                 <div key={k} className="flex items-baseline gap-2">
                   <dt className="text-xs text-faint">{k.replace(/_/g, " ")}</dt>
-                  <dd className="tnum font-mono text-[12px] text-fg">{typeof v === "object" ? JSON.stringify(v) : String(v)}</dd>
+                  <dd className="tnum text-sm text-fg">{typeof v === "object" ? JSON.stringify(v) : String(v)}</dd>
                 </div>
               ))}
             </dl>
@@ -85,7 +85,7 @@ export function ApprovalBanner({ caseId, run, onDone }: { caseId: string; run: S
             <Label htmlFor="comment">Comment</Label>
             <Textarea id="comment" value={comment} onChange={(e) => setComment(e.target.value)} placeholder={mode === "approve" ? "e.g. Evidence reviewed; canary first." : "Reason for rejection"} />
           </div>
-          {err && <div className="font-mono text-2xs text-bad">{err}</div>}
+          {err && <div className="text-2xs text-bad">{err}</div>}
           <div className="flex justify-end gap-2 pt-1">
             <Button size="sm" variant="ghost" onClick={() => setMode(null)}>Cancel</Button>
             <Button size="sm" variant={mode === "approve" ? "primary" : "danger"} disabled={busy || !approver.trim()} onClick={submit}>

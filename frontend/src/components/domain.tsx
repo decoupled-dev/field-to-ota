@@ -1,5 +1,11 @@
+import { Link as RouterLink } from "react-router-dom";
 import {
+  Bug,
   Check,
+  ChevronDown,
+  ChevronUp,
+  ChevronsUp,
+  Equal,
   Cpu,
   Database,
   ExternalLink,
@@ -104,23 +110,54 @@ export function CaseStatusChip({ status }: { status: CaseStatus }) {
   );
 }
 
-const SEVERITY_LEVEL: Record<string, number> = { low: 1, medium: 2, high: 3, critical: 4 };
+/** Jira-style priority glyphs for severity. */
+export const SEVERITY: Record<string, { label: string; icon: typeof Bug; cls: string; color: string }> = {
+  critical: { label: "Critical", icon: ChevronsUp, cls: "text-bad", color: "hsl(var(--bad))" },
+  high: { label: "High", icon: ChevronUp, cls: "text-bad", color: "hsl(var(--bad) / 0.75)" },
+  medium: { label: "Medium", icon: Equal, cls: "text-warn", color: "hsl(var(--warn))" },
+  low: { label: "Low", icon: ChevronDown, cls: "text-accent", color: "hsl(var(--accent))" },
+};
 
-/** Severity as a 4-step meter plus label, readable at a glance in dense tables. */
-export function SeverityBadge({ severity }: { severity: string | null | undefined }) {
+export function PriorityIcon({ severity, size = 16 }: { severity: string | null | undefined; size?: number }) {
+  const s = severity ? SEVERITY[severity] : undefined;
+  if (!s) return null;
+  return <s.icon size={size} strokeWidth={2.75} className={cn("shrink-0", s.cls)} aria-label={s.label} />;
+}
+
+/** Severity as a priority chevron plus label, the way Jira shows priority. */
+export function SeverityBadge({ severity, compact }: { severity: string | null | undefined; compact?: boolean }) {
   if (!severity) return <span className="text-faint">—</span>;
-  const lvl = SEVERITY_LEVEL[severity] ?? 1;
-  const color = lvl >= 3 ? "bg-bad" : lvl === 2 ? "bg-warn" : "bg-muted";
+  const s = SEVERITY[severity];
   return (
-    <span className="inline-flex items-center gap-2 text-xs">
-      <span className="flex items-end gap-[2px]">
-        {[1, 2, 3, 4].map((i) => (
-          <span key={i} className={cn("w-[3px] rounded-[1px]", i <= lvl ? color : "bg-border")} style={{ height: 4 + i * 2 }} />
-        ))}
-      </span>
-      <span className={lvl >= 3 ? "text-bad" : lvl === 2 ? "text-warn" : "text-muted"}>{severity}</span>
+    <span className="inline-flex items-center gap-1.5 text-sm text-fg" title={s?.label ?? severity}>
+      <PriorityIcon severity={severity} />
+      {!compact && (s?.label ?? severity)}
     </span>
   );
+}
+
+/** A case key as Jira shows an issue key: type icon plus a blue link. */
+export function IssueKey({ id, className }: { id: string; className?: string }) {
+  return (
+    <RouterLink to={`/cases/${id}`} onClick={(e) => e.stopPropagation()} className={cn("inline-flex items-center gap-1.5 whitespace-nowrap text-sm font-medium text-accent hover:underline", className)}>
+      <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-[3px] bg-bad text-white"><Bug size={11} strokeWidth={2.5} /></span>
+      {id}
+    </RouterLink>
+  );
+}
+
+// Phases mirror the Step Functions groups in infra/app.py.
+export const PHASES: { key: string; title: string; keys: string[] }[] = [
+  { key: "intake", title: "Intake", keys: ["field_discovery", "detect", "triage", "ticket"] },
+  { key: "diagnose", title: "Diagnose", keys: ["fleet", "reproduce", "rca"] },
+  { key: "engineer", title: "Engineer", keys: ["requirement", "fix", "verify"] },
+  { key: "release", title: "Release", keys: ["approve", "release", "monitor"] },
+];
+
+/** Board column for a case: its current stage's phase, or done once closed. */
+export function phaseOf(currentStage: string | null, status: CaseStatus): string {
+  if (status === "closed") return "done";
+  return PHASES.find((p) => currentStage && p.keys.includes(currentStage))?.key ?? "intake";
 }
 
 export const SOURCE_META: Record<SignalSource, { label: string; icon: typeof Globe; color: string }> = {
@@ -211,12 +248,12 @@ export function StageStrip({ stages, runs }: { stages: StageDef[]; runs: Partial
           const st = runs[s.key] ?? "pending";
           return (
             <Tip key={s.key} content={`${String(i + 1).padStart(2, "0")} ${s.name} · ${STATUS_LABEL[st]}`}>
-              <span className={cn("h-[14px] w-[7px] rounded-[1px]", SEG[st])} />
+              <span className={cn("h-2 w-[7px] rounded-full", SEG[st])} />
             </Tip>
           );
         })}
       </div>
-      <span className="tnum font-mono text-2xs text-faint">{String(done).padStart(2, "0")}/{stages.length}</span>
+      <span className="tnum text-xs text-faint">{done}/{stages.length}</span>
     </div>
   );
 }

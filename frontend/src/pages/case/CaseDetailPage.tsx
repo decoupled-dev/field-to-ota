@@ -207,7 +207,7 @@ function CaseHeader({ c, live }: { c: Case; live: boolean }) {
   return (
     <div>
       <div className="flex items-center gap-3">
-        <Breadcrumbs items={[{ label: "Cases", to: "/cases" }, { label: <span className="font-mono">{c.id}</span> }]} />
+        <Breadcrumbs items={[{ label: "Cases", to: "/cases" }, { label: c.id }]} />
         <span className="ml-auto inline-flex items-center gap-1.5 text-xs text-faint">
           <span className={cn("h-2 w-2 rounded-full", live ? "animate-pulseSoft bg-ok" : "bg-warn")} />
           {live ? "Live stream" : "Polling"}
@@ -300,7 +300,7 @@ function CaseSignals({ detail }: { detail: CaseDetail }) {
               </Td>
               <Td className="font-mono text-[12px] text-muted">{s.vin ?? s.author ?? "—"}</Td>
               <Td className="font-mono text-[12px]">{s.sw_version ?? "—"}</Td>
-              <Td className="tnum whitespace-nowrap text-right font-mono text-2xs text-faint">{timeAgo(s.created_at)}</Td>
+              <Td className="tnum whitespace-nowrap text-right text-2xs text-faint">{timeAgo(s.created_at)}</Td>
             </Tr>
           ))}
         </tbody>

@@ -34,7 +34,7 @@ export function TimelineView({ stages, runs, selected, onSelect }: { stages: Sta
                 className={cn("grid w-full grid-cols-[200px_1fr_90px] items-center gap-4 rounded-sm px-3 py-1.5 text-left transition-colors", selected === s.key ? "bg-raised shadow-[inset_2px_0_0_hsl(var(--fg))]" : "hover:bg-subtle/60")}
               >
                 <span className="flex min-w-0 items-baseline gap-2">
-                  <span className="tnum font-mono text-2xs text-faint">{String(i + 1).padStart(2, "0")}</span>
+                  <span className="tnum text-2xs text-faint">{String(i + 1).padStart(2, "0")}</span>
                   <span className={cn("truncate text-[12.5px] font-medium", st === "pending" ? "text-muted" : "text-fg")}>{s.name}</span>
                 </span>
                 <span className="flex min-w-0 items-center gap-2.5">
@@ -50,12 +50,12 @@ export function TimelineView({ stages, runs, selected, onSelect }: { stages: Sta
                       />
                     )}
                   </span>
-                  <span className={cn("tnum w-[92px] shrink-0 font-mono text-2xs uppercase", STATUS_TEXT[st])}>
+                  <span className={cn("tnum w-[92px] shrink-0 text-xs", STATUS_TEXT[st])}>
                     {d ? fmtDuration(r!.started_at, r!.ended_at) : STATUS_LABEL[st]}
                     {gate && d > 0 && <span className="text-faint"> wait</span>}
                   </span>
                 </span>
-                <span className="tnum text-right font-mono text-2xs text-faint">{r?.started_at && isFinite(t0) ? `+${fmtDuration(t0, r.started_at) || "0s"}` : "—"}</span>
+                <span className="tnum text-right text-2xs text-faint">{r?.started_at && isFinite(t0) ? `+${fmtDuration(t0, r.started_at) || "0s"}` : "—"}</span>
               </button>
             </li>
           );

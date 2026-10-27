@@ -209,7 +209,7 @@ export function AgentFeed({ intake, checkingUntil, live }: { intake?: Intake; ch
                 </span>
                 <div className="min-w-0 flex-1">
                   <div className={cn("pt-0.5 text-[13px] leading-5", a.kind === "check" || a.kind === "skip" ? "text-muted" : "text-fg")}>
-                    {a.case_id ? <>{a.text.split(a.case_id)[0]}<Link to={`/cases/${a.case_id}`} className="font-mono text-accent hover:underline">{a.case_id}</Link>{a.text.split(a.case_id).slice(1).join(a.case_id)}</> : a.text}
+                    {a.case_id ? <>{a.text.split(a.case_id)[0]}<Link to={`/cases/${a.case_id}`} className="text-accent hover:underline">{a.case_id}</Link>{a.text.split(a.case_id).slice(1).join(a.case_id)}</> : a.text}
                   </div>
                   <div className="mt-0.5 flex items-center gap-2 text-xs text-faint">
                     {meta && <span className="inline-flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full" style={{ background: meta.color }} />{meta.label}</span>}

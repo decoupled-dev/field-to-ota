@@ -37,7 +37,7 @@ function KV({ data }: { data: Record<string, unknown> }) {
             ) : typeof v === "string" && /^https?:\/\//.test(v) ? (
               <a href={v} target="_blank" rel="noreferrer" className="break-all font-mono text-[11.5px] text-accent hover:underline">{v}</a>
             ) : (
-              <span className={cn(typeof v === "number" && "tnum font-mono")}>{v == null || v === "" ? "—" : String(v)}</span>
+              <span className={cn(typeof v === "number" && "tnum")}>{v == null || v === "" ? "—" : String(v)}</span>
             )}
           </dd>
         </div>
@@ -177,7 +177,7 @@ function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0 px-3 py-2">
       <div className="label">{label}</div>
-      <div className="tnum mt-0.5 truncate font-mono text-[12px] text-fg">{value}</div>
+      <div className="tnum mt-0.5 truncate text-sm text-fg">{value}</div>
     </div>
   );
 }

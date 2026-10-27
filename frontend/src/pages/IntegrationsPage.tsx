@@ -64,13 +64,12 @@ export default function IntegrationsPage() {
       ) : !groups.length ? (
         <Card><Empty title="No connectors registered" /></Card>
       ) : (
-        <div className="space-y-px overflow-hidden rounded-md border border-border bg-border">
+        <div className="space-y-px overflow-hidden rounded-lg border border-border bg-border shadow-card">
           {groups.map((g) => (
             <section key={g.capability} className="grid bg-surface lg:grid-cols-[240px_1fr]">
               <div className="border-b border-border px-4 py-4 lg:border-b-0 lg:border-r">
                 <div className="text-sm font-semibold text-fg">{g.title}</div>
                 <div className="mt-1 text-xs leading-5 text-muted">{g.description}</div>
-                <div className="mt-2 font-mono text-[10px] text-faint">{g.capability}</div>
               </div>
               <div className="grid sm:grid-cols-2 2xl:grid-cols-3">
                 {g.items.map((i) => (
@@ -81,7 +80,7 @@ export default function IntegrationsPage() {
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center justify-between gap-2">
-                          <span className="truncate text-[13.5px] font-semibold">{i.name}</span>
+                          <span className="truncate text-sm font-semibold">{i.name}</span>
                           <Badge tone={STATUS[i.status]?.tone ?? "outline"}>{STATUS[i.status]?.label ?? i.status}</Badge>
                         </div>
                         <div className="text-xs text-faint">{i.vendor}</div>
@@ -91,12 +90,12 @@ export default function IntegrationsPage() {
                     <div className="mt-3 flex items-end gap-2">
                       <div className="flex min-w-0 flex-1 flex-wrap gap-1">
                         {i.stages.map((s) => (
-                          <span key={s} className="rounded-sm border border-border px-1.5 py-px font-mono text-[10px] text-muted">
-                            <span className="text-faint">{String(stageIndex(s) + 1).padStart(2, "0")}</span> {stageName(s)}
+                          <span key={s} className="rounded bg-subtle px-1.5 py-0.5 text-xs text-muted" title={`Stage ${stageIndex(s) + 1}`}>
+                            {stageName(s)}
                           </span>
                         ))}
                       </div>
-                      <Button size="sm" variant="ghost" onClick={() => setCfg(i)}>Configure</Button>
+                      <Button size="sm" variant="secondary" onClick={() => setCfg(i)}>Configure</Button>
                     </div>
                   </div>
                 ))}
