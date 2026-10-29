@@ -32,8 +32,8 @@ mkdir -p ~/.config/field-to-ota && chmod 700 ~/.config/field-to-ota
 cp deploy/device_apps.example.json ~/.config/field-to-ota/device_apps.json   # fill in device
 echo "F2F_DEVICE_API_KEY=$(openssl rand -hex 24)" > ~/.config/field-to-ota/device_key.env; chmod 600 ~/.config/field-to-ota/*.env
 cat > ~/.config/field-to-ota/field-to-ota.env <<'EOF'
-AWS_REGION=us-east-1
-BEDROCK_MODEL_ID=us.amazon.nova-lite-v1:0
+AWS_REGION=ap-southeast-2
+BEDROCK_MODEL_ID=apac.amazon.nova-lite-v1:0
 F2F_DEVICE_APPS_FILE=/home/ubuntu/.config/field-to-ota/device_apps.json
 ANDROID_HOME=/home/ubuntu/android-sdk
 HOST=127.0.0.1

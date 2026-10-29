@@ -3,9 +3,12 @@
 
     cd infra && .venv/bin/python app.py            # synth to cdk.out (no AWS account needed)
     npx cdk deploy --app ".venv/bin/python app.py"  # deploy (needs credentials + Bedrock model access)
+
+Region: `-c region=...`, else AWS_REGION, else CDK_DEFAULT_REGION, else ap-southeast-2.
 """
 from __future__ import annotations
 
+import os
 import shutil
 from pathlib import Path
 
@@ -283,5 +286,6 @@ class FieldToFixStack(cdk.Stack):
 
 
 app = cdk.App()
-FieldToFixStack(app, "FieldToFix", env=cdk.Environment(region="us-east-1"))
+region = app.node.try_get_context("region") or os.environ.get("AWS_REGION") or os.environ.get("CDK_DEFAULT_REGION") or "ap-southeast-2"
+FieldToFixStack(app, "FieldToFix", env=cdk.Environment(region=region))
 app.synth()

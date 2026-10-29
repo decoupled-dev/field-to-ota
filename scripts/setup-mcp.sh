@@ -2,7 +2,7 @@
 # setup-mcp.sh — configure MCP servers for field-to-fix in Kiro
 # Run once after cloning. Writes .kiro/settings/mcp.json.
 # Requires: uvx (uv), npx (Node 18+).
-# Optional env vars: GITHUB_PERSONAL_ACCESS_TOKEN, JIRA_URL, JIRA_EMAIL, JIRA_API_TOKEN
+# Optional env vars: AWS_REGION (default: aws configure region, else ap-southeast-2), GITHUB_PERSONAL_ACCESS_TOKEN, JIRA_URL, JIRA_EMAIL, JIRA_API_TOKEN
 
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -24,6 +24,7 @@ GH_TOKEN="${GITHUB_PERSONAL_ACCESS_TOKEN:-}"
 JIRA_URL="${JIRA_URL:-}"
 JIRA_USER="${JIRA_EMAIL:-}"
 JIRA_TOK="${JIRA_API_TOKEN:-}"
+REGION="${AWS_REGION:-$(aws configure get region 2>/dev/null || echo ap-southeast-2)}"
 
 cat > "$SETTINGS/mcp.json" << MCPEOF
 {
@@ -32,7 +33,7 @@ cat > "$SETTINGS/mcp.json" << MCPEOF
       "command": "$UVX",
       "args": ["awslabs.core-mcp-server@latest"],
       "env": {
-        "AWS_REGION": "us-east-1",
+        "AWS_REGION": "$REGION",
         "FASTMCP_LOG_LEVEL": "ERROR"
       },
       "disabled": false
@@ -49,7 +50,7 @@ cat > "$SETTINGS/mcp.json" << MCPEOF
       "command": "$UVX",
       "args": ["awslabs.bedrock-kb-retrieval-mcp-server@latest"],
       "env": {
-        "AWS_REGION": "us-east-1",
+        "AWS_REGION": "$REGION",
         "FASTMCP_LOG_LEVEL": "ERROR"
       },
       "disabled": false
@@ -58,7 +59,7 @@ cat > "$SETTINGS/mcp.json" << MCPEOF
       "command": "$UVX",
       "args": ["awslabs.iot-twinmaker-mcp-server@latest"],
       "env": {
-        "AWS_REGION": "us-east-1",
+        "AWS_REGION": "$REGION",
         "FASTMCP_LOG_LEVEL": "ERROR"
       },
       "disabled": false

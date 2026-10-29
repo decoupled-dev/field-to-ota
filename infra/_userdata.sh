@@ -15,21 +15,20 @@ cd field-to-ota
 # Build the console image (React build + FastAPI) using the repo Dockerfile.
 docker build -t field-to-fix-console:latest -f Dockerfile .
 
-# Run it, restart on reboot/crash. Bedrock/other integrations wired later via instance role + env.
+# App settings come from /etc/f2f.env, which _launch.sh writes ahead of this script. Launched some
+# other way, fall back to the instance's own region with simulated integrations.
 # DISCOVERY_AUTOSTART=1 starts the Field Discovery Agent loop in-process; it crawls complaint
 # sources for the configured OEM and opens cases through the signal pipeline.
+if [ ! -f /etc/f2f.env ]; then
+  TOKEN=$(curl -sX PUT http://169.254.169.254/latest/api/token -H 'X-aws-ec2-metadata-token-ttl-seconds: 60')
+  REGION=$(curl -s -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/placement/region)
+  printf 'AWS_REGION=%s\nF2F_MODE=aws\nDISCOVERY_AUTOSTART=1\n' "$REGION" > /etc/f2f.env
+fi
+
+# Run it, restart on reboot/crash.
 docker rm -f f2f-console 2>/dev/null || true
 docker run -d --name f2f-console --restart unless-stopped \
-  -p 8000:8000 \
-  -e AWS_REGION=us-east-1 \
-  -e DISCOVERY_AUTOSTART=1 \
-  -e DISCOVERY_OEM=Stellantis \
-  -e DISCOVERY_MODELS="Jeep,Dodge,RAM,Chrysler,Uconnect" \
-  -e DISCOVERY_INTERVAL=900 \
-  -e F2F_MODE=aws \
-  -e DISCOVERY_AGENTCORE_ARN="arn:aws:bedrock-agentcore:us-east-1:788953906715:harness/field_discovery_agent-khxNQ0iKW2" \
-  -e RCA_AGENTCORE_ARN="arn:aws:bedrock-agentcore:us-east-1:788953906715:harness/harness_rca-I8ulwPsauK" \
-  -e BEDROCK_MODEL_ID="us.amazon.nova-lite-v1:0" \
+  -p 8000:8000 --env-file /etc/f2f.env \
   field-to-fix-console:latest
 
 echo "F2F_BOOTSTRAP_DONE"

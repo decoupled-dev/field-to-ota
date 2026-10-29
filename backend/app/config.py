@@ -12,6 +12,11 @@ def _env(key: str, default: str | None = None) -> str | None:
     return v if v not in (None, "") else default
 
 
+def _inference_geo(region: str) -> str:
+    """Bedrock cross-region inference profile prefix for a region (us-east-1 -> us, ap-southeast-2 -> apac)."""
+    return {"us": "us", "ca": "us", "eu": "eu", "ap": "apac"}.get(region.split("-")[0], "us")
+
+
 class Settings:
     mode = _env("F2F_MODE", "local")  # local | aws
     state_dir = Path(_env("F2F_STATE_DIR", str(ROOT / ".state")))
@@ -21,10 +26,11 @@ class Settings:
     media_service_src = ROOT / "media-service"
     public_url = _env("F2F_PUBLIC_URL", "http://127.0.0.1:8000")
 
-    aws_region = _env("AWS_REGION", "us-east-1")
-    # Default to Amazon Nova (available without a Marketplace subscription). Override with
-    # BEDROCK_MODEL_ID to use Claude where the account has that model access enabled.
-    bedrock_model_id = _env("BEDROCK_MODEL_ID", "us.amazon.nova-lite-v1:0")
+    aws_region = _env("AWS_REGION", _env("AWS_DEFAULT_REGION", "ap-southeast-2"))
+    # Default to Amazon Nova (available without a Marketplace subscription) through the
+    # cross-region inference profile for aws_region's geography. Override with BEDROCK_MODEL_ID
+    # to use Claude where the account has that model access enabled.
+    bedrock_model_id = _env("BEDROCK_MODEL_ID", f"{_inference_geo(aws_region)}.amazon.nova-lite-v1:0")
     llm = _env("F2F_LLM", "auto")  # auto | bedrock | offline
     event_bus_name = _env("F2F_EVENT_BUS")  # EventBridge bus name (aws mode)
     iot_thing_group = _env("F2F_IOT_THING_GROUP", "f2f-affected-cohort")

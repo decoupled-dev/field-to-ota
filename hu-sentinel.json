@@ -4,7 +4,7 @@
   "uplink": "http",
   "api_base": "http://127.0.0.1:8000",
   "iot": {
-    "endpoint": "xxxxxxxxxxxxxx-ats.iot.us-east-1.amazonaws.com",
+    "endpoint": "xxxxxxxxxxxxxx-ats.iot.ap-southeast-2.amazonaws.com",
     "cert": ".keys/device/hu-demo-001.cert.pem",
     "key": ".keys/device/hu-demo-001.private.key",
     "ca": ".keys/device/AmazonRootCA1.pem"

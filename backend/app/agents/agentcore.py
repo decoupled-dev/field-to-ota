@@ -40,7 +40,9 @@ def _session_id(tag: str) -> str:
 def invoke(harness_arn: str, prompt: str, tag: str = "f2f") -> str:
     """Invoke the harness with a single user message; return the concatenated streamed text."""
     import boto3
-    client = boto3.client("bedrock-agentcore", region_name=settings.aws_region)
+    # A harness is regional; call it in the region its ARN names, which may differ from AWS_REGION.
+    region = harness_arn.split(":")[3] if harness_arn.count(":") >= 5 else settings.aws_region
+    client = boto3.client("bedrock-agentcore", region_name=region or settings.aws_region)
     resp = client.invoke_harness(
         harnessArn=harness_arn,
         runtimeSessionId=_session_id(tag),

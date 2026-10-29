@@ -4,7 +4,7 @@
       "command": "/home/dc/.local/bin/uvx",
       "args": ["awslabs.core-mcp-server@latest"],
       "env": {
-        "AWS_REGION": "us-east-1",
+        "AWS_REGION": "ap-southeast-2",
         "FASTMCP_LOG_LEVEL": "ERROR"
       },
       "disabled": false
@@ -21,7 +21,7 @@
       "command": "/home/dc/.local/bin/uvx",
       "args": ["awslabs.bedrock-kb-retrieval-mcp-server@latest"],
       "env": {
-        "AWS_REGION": "us-east-1",
+        "AWS_REGION": "ap-southeast-2",
         "FASTMCP_LOG_LEVEL": "ERROR"
       },
       "disabled": false
@@ -30,7 +30,7 @@
       "command": "/home/dc/.local/bin/uvx",
       "args": ["awslabs.iot-twinmaker-mcp-server@latest"],
       "env": {
-        "AWS_REGION": "us-east-1",
+        "AWS_REGION": "ap-southeast-2",
         "FASTMCP_LOG_LEVEL": "ERROR"
       },
       "disabled": false
