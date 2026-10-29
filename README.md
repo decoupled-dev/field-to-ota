@@ -62,6 +62,9 @@ unconfigured ones run in labelled *simulated* mode.
 | OTA | AWS IoT Jobs (aws mode) or device plane | OEM OTA backends |
 | LLM | Amazon Bedrock | — |
 
+## AWS access and the EC2 console
+See [docs/aws.md](docs/aws.md): credentials, region, and launching / redeploying / tearing down the console instance.
+
 ## AWS deployment (`infra/`, CDK Python)
 DynamoDB (single table) · S3 (bundles, telemetry) · EventBridge bus (`bug.detected` → pipeline) · **Step Functions**
 (stage groups as Lambda tasks, `waitForTaskToken` approval) · EventBridge Scheduler crawlers · IoT Core thing group,

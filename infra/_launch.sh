@@ -7,10 +7,17 @@
 #   KEY_NAME          default field-to-fix-key (created if missing; private key saved to infra/<name>.pem)
 #   INSTANCE_PROFILE  default f2f-console-agentcore-profile (created via _agentcore_role.sh if missing)
 #   INSTANCE_TYPE     default t3.small
+# Defaults for any of these can live in the repo .env; variables already set in the environment win.
 # App settings forwarded to the container (written to /etc/f2f.env on the instance):
 #   BEDROCK_MODEL_ID, DISCOVERY_AGENTCORE_ARN, RCA_AGENTCORE_ARN, DISCOVERY_OEM, DISCOVERY_MODELS, DISCOVERY_INTERVAL
 set -euo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd)
+
+if [ -f "$HERE/../.env" ]; then
+  while IFS='=' read -r k v; do
+    [[ $k =~ ^[A-Z_][A-Z0-9_]*$ ]] && [ -z "${!k:-}" ] && export "$k=$v"
+  done < "$HERE/../.env"
+fi
 
 REGION="${AWS_REGION:-$(aws configure get region 2>/dev/null || true)}"
 export AWS_REGION="${REGION:-ap-southeast-2}"
